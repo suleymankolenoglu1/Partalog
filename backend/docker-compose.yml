@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: katalogcu_db
+    environment:
+      POSTGRES_USER: postgres      # Burası postgres kalsın
+      POSTGRES_PASSWORD: Password123!
+      POSTGRES_DB: KatalogcuDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_new:/var/lib/postgresql/data  # 👈 İSMİ DEĞİŞTİRDİK!
+
+volumes:
+  pgdata_new:  # 👈 BURAYI DA DEĞİŞTİRDİK!
