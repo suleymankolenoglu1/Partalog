@@ -12,7 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Servislerin Eklendiği Bölüm
 // --------------------------------------------------------
 builder.Services.AddScoped<PdfService>();
-builder.Services.AddScoped<MockAiService>();
+builder.Services.AddScoped<ExcelService>();
+builder.Services.AddScoped<CloudOcrService>();
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     // İlişkisel verilerde sonsuz döngüyü engeller (Parent -> Child -> Parent)

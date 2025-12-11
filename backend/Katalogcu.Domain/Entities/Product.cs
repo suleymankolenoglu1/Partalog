@@ -12,6 +12,8 @@ namespace Katalogcu.Domain.Entities
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
         public string Category { get; set; } = string.Empty;
+        public string PageNumber {get;set;} = string.Empty;
+        public int RefNo {get;set;} 
         
         public Guid CatalogId { get; set; }
 

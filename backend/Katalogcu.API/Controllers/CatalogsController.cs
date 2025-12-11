@@ -4,6 +4,7 @@ using Katalogcu.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json; // JSON loglama için gerekli
 
 namespace Katalogcu.API.Controllers
 {
@@ -14,13 +15,13 @@ namespace Katalogcu.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly PdfService _pdfService;
-        private readonly MockAiService _mockAiService;
+        private readonly CloudOcrService _cloudService; 
 
-        public CatalogsController(AppDbContext context, PdfService pdfService, MockAiService mockAiService)
+        public CatalogsController(AppDbContext context, PdfService pdfService, CloudOcrService cloudService)
         {
             _context = context;
             _pdfService = pdfService;
-            _mockAiService = mockAiService;
+            _cloudService = cloudService;
         }
 
         // 1. Tüm Katalogları Listele
@@ -34,7 +35,7 @@ namespace Katalogcu.API.Controllers
             return Ok(catalogs);
         }
 
-        // 2. Tek Bir Katalog Getir
+        // 2. Tek Bir Katalog Getir (SIRALAMA GÜNCELLENDİ)
         [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
@@ -42,13 +43,23 @@ namespace Katalogcu.API.Controllers
             var catalog = await _context.Catalogs
                                         .Include(c => c.Pages.OrderBy(p => p.PageNumber))
                                         .ThenInclude(p => p.Hotspots)
+                                        // --- KRİTİK GÜNCELLEME ---
+                                        // Ürünleri çekerken sırasıyla:
+                                        // 1. Sayfa Numarası (Önce 4. sayfa, sonra 5. sayfa...)
+                                        // 2. Ref No (1, 2, 3...)
+                                        // 3. Oluşturulma Tarihi (RefNo 0 ise okuma sırasına göre)
+                                        .Include(c => c.Products
+                                            .OrderBy(pr => pr.PageNumber)
+                                            .ThenBy(pr => pr.RefNo)
+                                            .ThenBy(pr => pr.CreatedDate)
+                                        ) 
                                         .FirstOrDefaultAsync(c => c.Id == id);
 
             if (catalog == null) return NotFound("Katalog bulunamadı.");
             return Ok(catalog);
         }
 
-        // 3. Yeni Katalog Ekle (PDF İşleme ve Mock AI Dahil)
+        // 3. Yeni Katalog Ekle
         [HttpPost]
         public async Task<IActionResult> Create(Catalog catalog)
         {
@@ -62,7 +73,6 @@ namespace Katalogcu.API.Controllers
             {
                 try 
                 {
-                    // A) PDF -> Resim
                     var fileName = Path.GetFileName(catalog.PdfUrl);
                     var pageUrls = await _pdfService.ConvertPdfToImages(fileName);
 
@@ -80,13 +90,8 @@ namespace Katalogcu.API.Controllers
                         });
                     }
                     _context.CatalogPages.AddRange(newPages);
-
-                    // B) Mock AI: Sahte Parça Üretimi
-                    var fakeParts = _mockAiService.GenerateFakeParts(catalog.Id);
-                    _context.Products.AddRange(fakeParts);
-
-                    // Durum Güncelle
-                    catalog.Status = "Draft"; // Önce taslak olsun, kullanıcı yayınlasın
+                    
+                    catalog.Status = "Draft"; 
                     _context.Catalogs.Update(catalog);
                     await _context.SaveChangesAsync();
                 }
@@ -101,15 +106,83 @@ namespace Katalogcu.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = catalog.Id }, catalog);
         }
 
-        // 👇 EKSİK OLAN METOD BU (YENİDEN EKLENDİ) 👇
-        // 4. Kataloğu Yayınla (POST: api/catalogs/{id}/publish)
+        // 4. AI Analizi
+        [HttpPost("{id}/analyze")]
+        public async Task<IActionResult> Analyze(Guid id, [FromBody] AnalyzeRequest request)
+        {
+            var catalog = await _context.Catalogs.FirstOrDefaultAsync(c => c.Id == id);
+            if (catalog == null) return NotFound("Katalog bulunamadı.");
+            if (string.IsNullOrEmpty(catalog.PdfUrl)) return BadRequest("Kataloğun PDF dosyası yok.");
+
+            var page = await _context.CatalogPages.FindAsync(Guid.Parse(request.PageId));
+            if (page == null) return NotFound("Sayfa bulunamadı");
+
+            try 
+            {
+                var defaultRect = new RectObj { X = 0, Y = 0, W = 100, H = 100 };
+                var tableRect = request.TableRect ?? defaultRect;
+                var imageRect = request.ImageRect ?? defaultRect;
+
+                string pdfFileName = Path.GetFileName(catalog.PdfUrl);
+
+                var result = await _cloudService.AnalyzeCatalogPage(
+                    pdfFileName,
+                    page.PageNumber,
+                    page.ImageUrl,
+                    id,              
+                    page.Id,         
+                    tableRect,       
+                    imageRect        
+                );
+
+                // --- LOGLAMA (Güncellendi) ---
+                var logData = result.products.Select(p => new 
+                {
+                    page_number = p.PageNumber, // Artık nesnenin içinden geliyor
+                    ref_no = p.RefNo,
+                    part_code = p.Code,
+                    part_name = p.Name,
+                    quantity = p.StockQuantity
+                }).ToList();
+
+                var jsonLog = JsonSerializer.Serialize(logData, new JsonSerializerOptions { WriteIndented = true });
+                
+                Console.WriteLine("\n=== ☁️ CLOUD OCR RAW DATA (Saved to DB) ===");
+                Console.WriteLine(jsonLog);
+                Console.WriteLine("==========================================\n");
+                // --------------------------------
+
+                if (result.products.Any())
+                {
+                    _context.Products.AddRange(result.products);
+                }
+
+                if (result.hotspots.Any())
+                {
+                    _context.Hotspots.AddRange(result.hotspots);
+                }
+                
+                await _context.SaveChangesAsync();
+                
+                return Ok(new { 
+                    message = "AI Analizi Başarılı!", 
+                    productCount = result.products.Count, 
+                    hotspotCount = result.hotspots.Count 
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"AI Hatası: {ex.Message}");
+            }
+        }
+
+        // 5. Kataloğu Yayınla
         [HttpPost("{id}/publish")]
         public async Task<IActionResult> Publish(Guid id)
         {
             var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound();
 
-            // Durumu güncelle
             catalog.Status = "Published";
             catalog.UpdatedDate = DateTime.UtcNow;
 
@@ -117,9 +190,8 @@ namespace Katalogcu.API.Controllers
             
             return Ok(new { message = "Katalog yayına alındı", status = catalog.Status });
         }
-        // 👆 -------------------------------------- 👆
 
-        // 5. Katalog Sil (Gelişmiş Silme)
+        // 6. Katalog Sil
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -144,5 +216,12 @@ namespace Katalogcu.API.Controllers
 
             return NoContent();
         }
+    }
+
+    public class AnalyzeRequest
+    {
+        public required string PageId { get; set; }
+        public Katalogcu.API.Services.RectObj? TableRect { get; set; } 
+        public Katalogcu.API.Services.RectObj? ImageRect { get; set; }
     }
 }

@@ -17,5 +17,6 @@ namespace Katalogcu.Domain.Entities
         public AppUser? User { get; set; }
         
         public ICollection<CatalogPage> Pages { get; set; } = new List<CatalogPage>();
+        public ICollection<Product> Products { get; set; } = new List<Product>();
     }
 }
