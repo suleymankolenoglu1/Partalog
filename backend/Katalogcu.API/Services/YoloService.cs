@@ -30,6 +30,17 @@ namespace Katalogcu.API.Services
         /// <returns>Tespit edilen hotspot listesi</returns>
         public async Task<List<Hotspot>> DetectHotspotsAsync(string imageUrl, Guid pageId, double minConfidence = 0.5)
         {
+            // Input validation
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+                throw new ArgumentException("Image URL cannot be null or empty", nameof(imageUrl));
+            }
+
+            if (minConfidence < 0.0 || minConfidence > 1.0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(minConfidence), "Confidence must be between 0.0 and 1.0");
+            }
+
             try
             {
                 _logger.LogInformation("🔍 YOLO ile hotspot tespiti başlıyor: {ImageUrl}", imageUrl);
@@ -117,8 +128,7 @@ namespace Katalogcu.API.Services
 
                 _logger.LogInformation("📥 Görüntü indiriliyor: {Url}", fullUrl);
                 
-                using var client = new HttpClient();
-                var imageBytes = await client.GetByteArrayAsync(fullUrl);
+                var imageBytes = await _httpClient.GetByteArrayAsync(fullUrl);
                 
                 _logger.LogInformation("✅ Görüntü indirildi: {Size} bytes", imageBytes.Length);
                 return imageBytes;

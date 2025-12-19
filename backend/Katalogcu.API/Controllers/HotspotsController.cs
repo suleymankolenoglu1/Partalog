@@ -28,6 +28,12 @@ namespace Katalogcu.API.Controllers
         [HttpPost("detect/{pageId}")]
         public async Task<IActionResult> DetectHotspots(Guid pageId, [FromQuery] double minConfidence = 0.5)
         {
+            // Input validation
+            if (minConfidence < 0.0 || minConfidence > 1.0)
+            {
+                return BadRequest(new { error = "minConfidence parametresi 0.0 ile 1.0 arasında olmalıdır" });
+            }
+
             try
             {
                 // Sayfayı bul
