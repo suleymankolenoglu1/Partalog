@@ -229,7 +229,10 @@ backend/Katalogcu.sln             # .NET Solution dosyası
 3. **AddPageNumberToProduct** (10 Aralık 2025)
    - Ürünlere sayfa numarası özelliği eklendi
 
-4. **UpdateHotspotForYolo** (18 Aralık 2025)
+4. **AddRefNoToProduct** (10 Aralık 2025)
+   - Ürünlere referans numarası özelliği eklendi
+
+5. **UpdateHotspotForYolo** (18 Aralık 2025)
    - YOLO entegrasyonu için Hotspot güncellemeleri
 
 ---
@@ -267,10 +270,10 @@ python api.py
 
 ## 📦 Dosya Sayıları
 
-- **C# Dosyaları**: Controllers (6), Services (3), Entities (5), Migrations (4+)
-- **Python Dosyaları**: API ve ML logic
-- **Angular Projesi**: Tam frontend uygulaması
-- **Config Dosyaları**: Docker, .NET project files, Python requirements
+- **C# Dosyaları**: Controllers (6), Services (3), Entities (5), Migrations (11)
+- **Python Dosyaları**: 2 (API ve ML logic)
+- **Angular Projesi**: Henüz geliştirilme aşamasında
+- **Config Dosyaları**: Docker, .NET project files (4), Python requirements
 
 ---
 
