@@ -107,13 +107,15 @@ backend/docker-compose.yml        # PostgreSQL container yapılandırması
 ## 🎨 Frontend (Angular)
 
 ```
-frontend/katalogcu-frontend/      # Angular uygulaması
+frontend/katalogcu-frontend/      # Angular uygulaması (Henüz geliştirilme aşamasında)
 ```
 
 **Teknolojiler:**
-- Angular Framework
+- Angular Framework (Planlanmış)
 - TypeScript
 - Port: 4200 (development)
+
+**Not:** Frontend dizini mevcut ancak Angular projesinin kurulumu henüz tamamlanmamış.
 
 ---
 
