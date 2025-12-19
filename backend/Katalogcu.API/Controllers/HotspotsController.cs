@@ -32,8 +32,8 @@ namespace Katalogcu.API.Controllers
             if (page == null) return NotFound("Sayfa bulunamadı.");
 
             // Otomatik numara ver (Mevcutların en büyüğü + 1)
-            int nextNumber = page.Hotspots.Any() ? page.Hotspots.Max(h => h.Number) + 1 : 1;
-            hotspot.Number = nextNumber;
+            //int nextNumber = page.Hotspots.Any() ? page.Hotspots.Max(h => h.Number.ToString) + 1 : 1;
+            //hotspot.Number = nextNumber;
             hotspot.CreatedDate = DateTime.UtcNow;
 
             _context.Hotspots.Add(hotspot);

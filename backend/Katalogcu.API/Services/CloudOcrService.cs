@@ -1,7 +1,9 @@
-using Google.Cloud.DocumentAI.V1;
+using Google. Cloud.DocumentAI.V1;
+using Google. Cloud.Vision.V1;
 using Google. Protobuf;
 using Google.Apis.Auth.OAuth2;
 using Grpc.Auth;
+using Grpc.Core;
 using Katalogcu.Domain. Entities;
 using SixLabors.ImageSharp;
 using SixLabors. ImageSharp.Processing;
@@ -9,9 +11,14 @@ using SixLabors.ImageSharp. Formats. Png;
 using System.Text. RegularExpressions;
 using System.Text;
 using PdfSharpCore.Pdf;
-using PdfSharpCore.Pdf. IO;
+using PdfSharpCore.Pdf.IO;
 
-namespace Katalogcu.API. Services
+// Alias tanımlamaları - isim çakışmalarını çözer
+using DomainProduct = Katalogcu.Domain.Entities.Product;
+using VisionImage = Google.Cloud. Vision.V1.Image;
+using SharpImage = SixLabors.ImageSharp. Image;
+
+namespace Katalogcu. API.Services
 {
     public class RectObj
     {
@@ -30,22 +37,26 @@ namespace Katalogcu.API. Services
 
         public CloudOcrService(IConfiguration configuration, IWebHostEnvironment env)
         {
-            _projectId = configuration["GoogleCloudSettings:ProjectId"]!;
+            _projectId = configuration["GoogleCloudSettings:ProjectId"]! ;
             _location = configuration["GoogleCloudSettings:Location"]!;
             _processorId = configuration["GoogleCloudSettings:ProcessorId"]!;
             _env = env;
         }
 
-        public async Task<(List<Product> products, List<Hotspot> hotspots)> AnalyzeCatalogPage(
+        /// <summary>
+        /// Katalog sayfasını analiz eder - Tablo ve Teknik Resim FARKLI SAYFALARDA olabilir
+        /// </summary>
+        public async Task<(List<DomainProduct> products, List<Hotspot> hotspots)> AnalyzeCatalogPage(
             string pdfFileName,
-            int pageNumber,
+            int tablePageNumber,
+            int imagePageNumber,
             string imageFilePath,
             Guid catalogId,
-            Guid pageId,
+            Guid imagePageId,
             RectObj tableRect,
             RectObj imageRect)
         {
-            var products = new List<Product>();
+            var products = new List<DomainProduct>();
             var hotspots = new List<Hotspot>();
             var foundRefNumbers = new HashSet<int>();
 
@@ -67,13 +78,18 @@ namespace Katalogcu.API. Services
             }
 
             Console.WriteLine("\n" + new string('=', 80));
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console. WriteLine($"📄 GOOGLE CLOUD - ENHANCED TABLE PARSER V5");
+            Console.ForegroundColor = ConsoleColor. Cyan;
+            Console.WriteLine($"📄 GOOGLE CLOUD - HYBRID ANALYZER V8");
+            Console. WriteLine($"   📋 Tablo:  Document AI | 🎯 Hotspot: Vision API");
             Console.ResetColor();
-            Console.WriteLine($"   PDF: {pdfFileName} (Sayfa:  {pageNumber})");
+            Console.WriteLine($"   📋 Tablo Sayfası: {tablePageNumber}");
+            Console.WriteLine($"   🎨 Teknik Resim Sayfası: {imagePageNumber}");
+            Console.WriteLine($"   📁 PDF:  {pdfFileName}");
 
-            await AnalyzeTableFromPdf(fullPdfPath, pageNumber, tableRect, catalogId, products, foundRefNumbers);
+            // ADIM 1: Tablo sayfasından ürünleri oku (Document AI)
+            await AnalyzeTableFromPdf(fullPdfPath, tablePageNumber, tableRect, catalogId, products, foundRefNumbers);
 
+            // ADIM 2: Teknik resim sayfasından hotspot'ları oluştur (Vision API)
             string imageFileName = Path.GetFileName(imageFilePath);
             string fullImagePath = Path. Combine(webRoot, "uploads", "pages", imageFileName);
             if (!File.Exists(fullImagePath))
@@ -81,15 +97,14 @@ namespace Katalogcu.API. Services
                 fullImagePath = Path. Combine(webRoot, "wwwroot", "uploads", "pages", imageFileName);
             }
 
-            if (foundRefNumbers.Count > 0 && File.Exists(fullImagePath))
-            {
-                using var originalImage = await Image.LoadAsync(fullImagePath);
-                await CreateHotspotsWithGoogle(originalImage, imageRect, pageId, products, foundRefNumbers, hotspots);
-            }
+           
             else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console. WriteLine("⚠️ Hotspot atlandı (Ürün yok veya resim bulunamadı).");
+                if (foundRefNumbers. Count == 0)
+                    Console.WriteLine("⚠️ Hotspot atlandı: Tabloda RefNo bulunamadı.");
+                else
+                    Console.WriteLine($"⚠️ Hotspot atlandı: Resim bulunamadı ({fullImagePath})");
                 Console.ResetColor();
             }
 
@@ -98,16 +113,47 @@ namespace Katalogcu.API. Services
             Console. WriteLine($"✅ İŞLEM TAMAMLANDI");
             Console.ResetColor();
             Console.WriteLine($"   📦 Bulunan Ürün:  {products.Count}");
+            Console. WriteLine($"   🎯 Oluşturulan Hotspot: {hotspots.Count}");
 
             return (products, hotspots);
         }
 
-        private DocumentProcessorServiceClient CreateClient()
+        /// <summary>
+        /// Geriye dönük uyumluluk için eski metod imzası (tek sayfa)
+        /// </summary>
+        public async Task<(List<DomainProduct> products, List<Hotspot> hotspots)> AnalyzeCatalogPage(
+            string pdfFileName,
+            int pageNumber,
+            string imageFilePath,
+            Guid catalogId,
+            Guid pageId,
+            RectObj tableRect,
+            RectObj imageRect)
+        {
+            return await AnalyzeCatalogPage(
+                pdfFileName,
+                pageNumber,
+                pageNumber,
+                imageFilePath,
+                catalogId,
+                pageId,
+                tableRect,
+                imageRect
+            );
+        }
+
+        #region API Clients
+
+        /// <summary>
+        /// Document AI Client - Tablo okuma için
+        /// </summary>
+        private DocumentProcessorServiceClient CreateDocumentAIClient()
         {
             var endpoint = $"{_location}-documentai.googleapis.com";
             string fullCredentialPath = Path. Combine(_env.ContentRootPath, "google-key.json");
 
-            if (!File.Exists(fullCredentialPath)) throw new FileNotFoundException($"Google Key bulunamadı:  {fullCredentialPath}");
+            if (!File. Exists(fullCredentialPath))
+                throw new FileNotFoundException($"Google Key bulunamadı:  {fullCredentialPath}");
 
             var credential = GoogleCredential. FromFile(fullCredentialPath)
                     .CreateScoped(DocumentProcessorServiceClient. DefaultScopes);
@@ -118,6 +164,29 @@ namespace Katalogcu.API. Services
                 ChannelCredentials = credential.ToChannelCredentials()
             }.Build();
         }
+
+        /// <summary>
+        /// Vision API Client - Hotspot tespiti için
+        /// </summary>
+        private ImageAnnotatorClient CreateVisionClient()
+        {
+            string fullCredentialPath = Path.Combine(_env.ContentRootPath, "google-key.json");
+
+            if (!File. Exists(fullCredentialPath))
+                throw new FileNotFoundException($"Google Key bulunamadı: {fullCredentialPath}");
+
+            // Credential'ı doğru şekilde yükle
+            var credential = GoogleCredential.FromFile(fullCredentialPath);
+
+            return new ImageAnnotatorClientBuilder
+            {
+                Credential = credential
+            }.Build();
+        }
+
+        #endregion
+
+        #region Table Structure Detection
 
         private class TableStructure
         {
@@ -142,9 +211,9 @@ namespace Katalogcu.API. Services
             for (int rowIdx = 0; rowIdx < Math.Min(3, allRows.Count); rowIdx++)
             {
                 var row = allRows[rowIdx];
-                var cells = row. Cells. Select(c => GetTextFromLayout(fullText, c. Layout).ToLower().Trim()).ToList();
+                var cells = row. Cells.Select(c => GetTextFromLayout(fullText, c. Layout).ToLower().Trim()).ToList();
 
-                Console.WriteLine($"   📝 Satır {rowIdx} hücreleri: [{string.Join("] [", cells)}]");
+                Console.WriteLine($"   📝 Satır {rowIdx} hücreleri:  [{string.Join("] [", cells)}]");
 
                 for (int colIdx = 0; colIdx < cells.Count; colIdx++)
                 {
@@ -157,7 +226,7 @@ namespace Katalogcu.API. Services
                         structure.MergedRefCodeIndex = colIdx;
                         structure.RefIndex = colIdx;
                         structure.CodeIndex = colIdx;
-                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.ForegroundColor = ConsoleColor. Magenta;
                         Console.WriteLine($"      ✓ BİRLEŞİK SÜTUN tespit edildi:  [{colIdx}] = '{cellText. Replace("\n", "\\n")}'");
                         Console.ResetColor();
                     }
@@ -203,7 +272,7 @@ namespace Katalogcu.API. Services
                 structure.NameIndex = structure.TotalColumns - 1;
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"   ✅ Final Yapı:  Ref[{structure.RefIndex}], Code[{structure. CodeIndex}], Name[{structure. NameIndex}], Merged={structure.IsMergedRefCode}");
+            Console. WriteLine($"   ✅ Final Yapı:  Ref[{structure.RefIndex}], Code[{structure.CodeIndex}], Name[{structure.NameIndex}], Merged={structure.IsMergedRefCode}");
             Console.ResetColor();
 
             return structure;
@@ -225,7 +294,6 @@ namespace Katalogcu.API. Services
         private bool IsRefNoColumn(string text)
         {
             if (text.Contains("parts")) return false;
-
             var exactMatches = new[] { "no", "no.", "ref", "ref.", "pos", "pos.", "item", "#" };
             return exactMatches.Contains(text);
         }
@@ -259,12 +327,16 @@ namespace Katalogcu.API. Services
             var headerPatterns = new[]
             {
                 "parts no", "part no", "description", "parts name", "part name",
-                "ref. no", "ref no", "品名", "amt.  req", "remarks", "level", "cons", "qty"
+                "ref.  no", "ref no", "品名", "amt.  req", "remarks", "level", "cons", "qty"
             };
             string lowerText = rowText.ToLower();
             int matchCount = headerPatterns.Count(p => lowerText.Contains(p));
             return matchCount >= 2;
         }
+
+        #endregion
+
+        #region Merged Column Parsing
 
         private (string refNo, string partCode) SplitMergedRefCode(string mergedValue, int expectedRefNo)
         {
@@ -275,10 +347,10 @@ namespace Katalogcu.API. Services
             cleaned = Regex.Replace(cleaned, @"\s+", " ");
 
             // YÖNTEM 1: Boşlukla ayrılmış
-            var spaceMatch = Regex.Match(cleaned, @"^(\d{1,3})\s+(. +)$");
+            var spaceMatch = Regex.Match(cleaned, @"^(\d{1,3})\s+(.+)$");
             if (spaceMatch.Success)
             {
-                string refNo = spaceMatch.Groups[1]. Value;
+                string refNo = spaceMatch.Groups[1].Value;
                 string partCode = spaceMatch.Groups[2]. Value. Replace(" ", "");
                 return (refNo, partCode);
             }
@@ -330,10 +402,14 @@ namespace Katalogcu.API. Services
             return ("", cleaned. Replace(" ", ""));
         }
 
+        #endregion
+
+        #region Validation Methods
+
         private bool IsValidPartCode(string code)
         {
             if (string. IsNullOrWhiteSpace(code)) return false;
-            if (code. Length < 2) return false;
+            if (code.Length < 2) return false;
             if (code.Length > 25) return false;
 
             bool hasDigit = code.Any(char.IsDigit);
@@ -346,7 +422,7 @@ namespace Katalogcu.API. Services
         private bool IsValidRefNumber(string refNo, out int number)
         {
             number = 0;
-            if (string. IsNullOrWhiteSpace(refNo)) return false;
+            if (string.IsNullOrWhiteSpace(refNo)) return false;
 
             string cleanRef = Regex.Replace(refNo, @"[^\d]", "");
             if (int.TryParse(cleanRef, out number))
@@ -356,12 +432,16 @@ namespace Katalogcu.API. Services
             return false;
         }
 
+        #endregion
+
+        #region Table Analysis (Document AI)
+
         private async Task AnalyzeTableFromPdf(
             string pdfPath,
             int pageNumber,
             RectObj tableRect,
             Guid catalogId,
-            List<Product> products,
+            List<DomainProduct> products,
             HashSet<int> foundRefNumbers)
         {
             try
@@ -372,12 +452,12 @@ namespace Katalogcu.API. Services
                 if (pageIndex < 0 || pageIndex >= inputDocument. PageCount) return;
 
                 var outputDocument = new PdfDocument();
-                outputDocument. AddPage(inputDocument.Pages[pageIndex]);
+                outputDocument.AddPage(inputDocument. Pages[pageIndex]);
                 outputDocument.Save(outputStream);
                 outputStream.Position = 0;
                 var pdfBytes = await ByteString.FromStreamAsync(outputStream);
 
-                var client = CreateClient();
+                var client = CreateDocumentAIClient();
                 var processorName = ProcessorName. FromProjectLocationProcessor(_projectId, _location, _processorId);
                 var request = new ProcessRequest
                 {
@@ -386,7 +466,7 @@ namespace Katalogcu.API. Services
                 };
 
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console. WriteLine($"☁️ Google Cloud'a PDF gönderiliyor...");
+                Console. WriteLine($"☁️ Document AI'a PDF gönderiliyor (Sayfa {pageNumber})...");
                 Console.ResetColor();
 
                 var response = await client.ProcessDocumentAsync(request);
@@ -397,18 +477,18 @@ namespace Katalogcu.API. Services
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("❌ Google bu PDF sayfasında tablo yapısı bulamadı.");
-                    Console. ResetColor();
+                    Console.ResetColor();
                     return;
                 }
 
-                Console.WriteLine($"📊 Sayfada {page. Tables.Count} tablo bulundu.");
+                Console.WriteLine($"📊 Sayfada {page.Tables.Count} tablo bulundu.");
 
                 foreach (var table in page.Tables)
                 {
                     var vertices = table.Layout.BoundingPoly.NormalizedVertices;
                     double tX = (vertices[0].X + vertices[2].X) / 2.0 * 100;
                     double tY = (vertices[0].Y + vertices[2].Y) / 2.0 * 100;
-                    bool isTargetTable = tX >= tableRect.X && tX <= (tableRect.X + tableRect.W) &&
+                    bool isTargetTable = tX >= tableRect. X && tX <= (tableRect.X + tableRect.W) &&
                                          tY >= tableRect.Y && tY <= (tableRect.Y + tableRect.H);
 
                     if (isTargetTable)
@@ -431,7 +511,7 @@ namespace Katalogcu.API. Services
                         {
                             var row = allRows[rowIdx];
 
-                            string rawRowText = string.Join(" ", row.Cells.Select(c => GetTextFromLayout(document.Text, c.Layout)));
+                            string rawRowText = string.Join(" ", row.Cells.Select(c => GetTextFromLayout(document.Text, c. Layout)));
                             if (IsHeaderRow(rawRowText))
                             {
                                 skippedRows++;
@@ -461,9 +541,9 @@ namespace Katalogcu.API. Services
                             }
                             else
                             {
-                                refNo = GetCell(structure. RefIndex);
+                                refNo = GetCell(structure.RefIndex);
                                 partCode = GetCell(structure.CodeIndex);
-                                partName = GetCell(structure.NameIndex);
+                                partName = GetCell(structure. NameIndex);
 
                                 if (rowIdx - startRowIndex < 5)
                                 {
@@ -490,9 +570,8 @@ namespace Katalogcu.API. Services
                                     expectedRefNo++;
                                 }
 
-                                // ✨ DÜZELTİLMİŞ:  RefNo dahil edildi
                                 bool added = AddProduct(products, catalogId, partCode, partName, refNumber, pageNumber);
-                                
+
                                 if (added)
                                 {
                                     if (refNumber > 0)
@@ -523,29 +602,29 @@ namespace Katalogcu.API. Services
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Hata: {ex. Message}");
+                Console.ForegroundColor = ConsoleColor. Red;
+                Console.WriteLine($"❌ Tablo Analiz Hatası: {ex.Message}");
                 Console.ResetColor();
             }
         }
 
+        #endregion
+
+        #region Helper Methods
+
         private string CleanPartCode(string code)
         {
             if (string.IsNullOrEmpty(code)) return "";
-
             code = code.Replace("\n", "").Replace("\r", "");
             code = Regex.Replace(code, @"\s+", "");
-
-            return code. Trim();
+            return code.Trim();
         }
 
         private string CleanPartName(string name)
         {
             if (string.IsNullOrEmpty(name)) return "";
-
             name = name.Replace("_", " ");
             name = Regex.Replace(name, @"\s+", " ");
-
             return name.Trim();
         }
 
@@ -577,89 +656,190 @@ namespace Katalogcu.API. Services
             return (refNo, partCode, partName);
         }
 
-        private async Task CreateHotspotsWithGoogle(Image originalImage, RectObj imageRect, Guid pageId, List<Product> products, HashSet<int> foundRefNumbers, List<Hotspot> hotspots)
-        {
-            Console.WriteLine("\n🎯 HOTSPOT ANALİZİ.. .");
-            using var drawingCropStream = new MemoryStream();
-            int x = Math.Max(0, (int)((imageRect.X / 100.0) * originalImage.Width));
-            int y = Math.Max(0, (int)((imageRect.Y / 100.0) * originalImage.Height));
-            int w = Math.Min(originalImage.Width - x, (int)((imageRect.W / 100.0) * originalImage.Width));
-            int h = Math.Min(originalImage.Height - y, (int)((imageRect.H / 100.0) * originalImage.Height));
-            if (w <= 10 || h <= 10) return;
-
-            originalImage.Clone(ctx => ctx. Crop(new Rectangle(x, y, w, h))).Save(drawingCropStream, new PngEncoder());
-            drawingCropStream.Position = 0;
-
-            try
-            {
-                var client = CreateClient();
-                var processorName = ProcessorName.FromProjectLocationProcessor(_projectId, _location, _processorId);
-                var imageBytes = await ByteString.FromStreamAsync(drawingCropStream);
-                var request = new ProcessRequest { Name = processorName.ToString(), RawDocument = new RawDocument { Content = imageBytes, MimeType = "image/png" } };
-                var response = await client.ProcessDocumentAsync(request);
-
-                if (response.Document?. Pages?. FirstOrDefault() == null) return;
-
-                foreach (var token in response.Document. Pages[0].Tokens)
-                {
-                    string text = GetTextFromLayout(response.Document.Text, token.Layout).Trim();
-                    if (int.TryParse(text, out int number) && foundRefNumbers.Contains(number))
-                    {
-                        var matchedProduct = products. FirstOrDefault(p => p.RefNo == number);
-                        var vertices = token.Layout. BoundingPoly.NormalizedVertices;
-                        double centerX = (vertices[0].X + vertices[2]. X) / 2.0;
-                        double centerY = (vertices[0]. Y + vertices[2].Y) / 2.0;
-                        double finalX = imageRect.X + (centerX * imageRect.W);
-                        double finalY = imageRect.Y + (centerY * imageRect. H);
-
-                        if (matchedProduct != null && ! hotspots.Any(h => h.Number == number))
-                        {
-                            hotspots.Add(new Hotspot { Id = Guid.NewGuid(), PageId = pageId, ProductId = matchedProduct.Id, Number = number, X = finalX, Y = finalY, CreatedDate = DateTime. UtcNow });
-                            Console.WriteLine($"   ✅ Hotspot:  {number}");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex) { Console.WriteLine($"Hotspot Hatası: {ex. Message}"); }
-        }
-
-        private string GetTextFromLayout(string fullText, Document.Types.Page. Types.Layout layout)
+        private string GetTextFromLayout(string fullText, Document.Types.Page.Types. Layout layout)
         {
             if (layout?. TextAnchor?. TextSegments == null) return "";
             StringBuilder sb = new StringBuilder();
             foreach (var segment in layout.TextAnchor.TextSegments)
             {
-                int start = (int)segment.StartIndex; int end = (int)segment.EndIndex;
-                if (start >= 0 && end > start && end <= fullText.Length) sb.Append(fullText.Substring(start, end - start));
+                int start = (int)segment.StartIndex;
+                int end = (int)segment.EndIndex;
+                if (start >= 0 && end > start && end <= fullText. Length)
+                    sb.Append(fullText.Substring(start, end - start));
             }
             return sb. ToString();
         }
 
+        #endregion
+
+        #region Vision API Hotspot Detection
+
         /// <summary>
-        /// Ürün ekleme - RefNo ile birlikte duplicate kontrolü
-        /// Aynı RefNo ile aynı sayfada zaten varsa ekleme yapılmaz
-        /// Aynı Code farklı RefNo ile eklenebilir (tabloda aynı parça farklı pozisyonlarda olabilir)
+        /// Vision API ile Hotspot Tespiti - Daha hassas ve hızlı
         /// </summary>
-        private bool AddProduct(List<Product> products, Guid catalogId, string code, string name, int refNo, int pageNumber)
+        
+            // Bulunamayan numaraları raporla
+           
+
+        /// <summary>
+        /// Vision API başarısız olursa Document AI ile dene
+        /// </summary>
+        private async Task FallbackToDocumentAI(
+            SharpImage croppedImage,
+            int cropW,
+            int cropH,
+            RectObj imageRect,
+            HashSet<int> foundRefNumbers,
+            Dictionary<int, (double x, double y, double confidence)> detectedNumbers)
         {
-            // ✨ YENİ KONTROL: RefNo bazlı duplicate kontrolü
-            // Aynı RefNo aynı sayfada zaten varsa ekleme
+            try
+            {
+                using var imageStream = new MemoryStream();
+                await croppedImage.SaveAsPngAsync(imageStream);
+                imageStream.Position = 0;
+
+                var client = CreateDocumentAIClient();
+                var processorName = ProcessorName. FromProjectLocationProcessor(_projectId, _location, _processorId);
+                var imageBytes = await ByteString.FromStreamAsync(imageStream);
+
+                var request = new ProcessRequest
+                {
+                    Name = processorName.ToString(),
+                    RawDocument = new RawDocument
+                    {
+                        Content = imageBytes,
+                        MimeType = "image/png"
+                    }
+                };
+
+                var response = await client.ProcessDocumentAsync(request);
+
+                if (response. Document?. Pages?.FirstOrDefault() == null) return;
+
+                var docPage = response.Document.Pages[0];
+                int foundCount = 0;
+
+                foreach (var token in docPage. Tokens)
+                {
+                    string tokenText = GetTextFromLayout(response.Document.Text, token.Layout).Trim();
+
+                    var extractedNumbers = ExtractNumbersFromText(tokenText);
+
+                    foreach (int number in extractedNumbers)
+                    {
+                        if (! foundRefNumbers.Contains(number)) continue;
+                        if (detectedNumbers.ContainsKey(number)) continue;
+
+                        var vertices = token. Layout. BoundingPoly.NormalizedVertices;
+                        if (vertices == null || vertices.Count < 4) continue;
+
+                        double normCenterX = (vertices[0].X + vertices[2]. X) / 2.0;
+                        double normCenterY = (vertices[0].Y + vertices[2].Y) / 2.0;
+
+                        double finalX = imageRect.X + (normCenterX * imageRect.W);
+                        double finalY = imageRect.Y + (normCenterY * imageRect. H);
+
+                        finalX = Math.Max(0, Math. Min(100, finalX));
+                        finalY = Math. Max(0, Math.Min(100, finalY));
+
+                        double confidence = token.Layout.Confidence > 0 ? token.Layout. Confidence : 0.8;
+
+                        detectedNumbers[number] = (finalX, finalY, confidence);
+                        foundCount++;
+                    }
+                }
+
+                Console. WriteLine($"      → Document AI ile {foundCount} ek numara bulundu");
+            }
+            catch (Exception ex)
+            {
+                Console. WriteLine($"      ❌ Document AI Fallback Hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Metinden numaraları çıkar - Aralıkları ve özel formatları destekler
+        /// </summary>
+        private List<int> ExtractNumbersFromText(string text)
+        {
+            var numbers = new List<int>();
+
+            if (string.IsNullOrWhiteSpace(text)) return numbers;
+
+            text = text. Trim();
+
+            // PATTERN 1: Aralık formatı "21~25" veya "21-25" veya "21～25"
+            var rangeMatch = Regex.Match(text, @"^(\d{1,3})\s*[~\-～]\s*(\d{1,3})$");
+            if (rangeMatch. Success)
+            {
+                int start = int.Parse(rangeMatch. Groups[1].Value);
+                int end = int.Parse(rangeMatch.Groups[2].Value);
+
+                if (end > start && (end - start) <= 20)
+                {
+                    for (int i = start; i <= end; i++)
+                    {
+                        numbers.Add(i);
+                    }
+                    return numbers;
+                }
+            }
+
+            // PATTERN 2: İki numara yan yana "10·11" veya "10-11" veya "10,11"
+            var pairMatch = Regex.Match(text, @"^(\d{1,3})\s*[·\-,\. ]\s*(\d{1,3})$");
+            if (pairMatch. Success)
+            {
+                if (int.TryParse(pairMatch. Groups[1].Value, out int num1))
+                    numbers.Add(num1);
+                if (int. TryParse(pairMatch.Groups[2].Value, out int num2))
+                    numbers. Add(num2);
+                return numbers;
+            }
+
+            // PATTERN 3: Tek numara
+            if (Regex.IsMatch(text, @"^\d{1,3}$"))
+            {
+                if (int.TryParse(text, out int singleNum) && singleNum >= 1 && singleNum <= 999)
+                {
+                    numbers.Add(singleNum);
+                }
+                return numbers;
+            }
+
+            // PATTERN 4: Metinde gömülü numaralar
+            var embeddedMatches = Regex. Matches(text, @"\b(\d{1,3})\b");
+            foreach (Match m in embeddedMatches)
+            {
+                if (int.TryParse(m.Groups[1].Value, out int num) && num >= 1 && num <= 999)
+                {
+                    numbers. Add(num);
+                }
+            }
+
+            return numbers. Distinct().ToList();
+        }
+
+        #endregion
+
+        #region Product Management
+
+        private bool AddProduct(List<DomainProduct> products, Guid catalogId, string code, string name, int refNo, int pageNumber)
+        {
             if (refNo > 0 && products.Any(p => p.RefNo == refNo && p.PageNumber == pageNumber. ToString()))
             {
                 Console.WriteLine($"   🔄 Duplicate (RefNo): Ref={refNo}, Code={code}");
                 return false;
             }
 
-            // RefNo yoksa (0), aynı kod aynı sayfada varsa ekleme
-            if (refNo == 0 && products.Any(p => p.Code == code && p.PageNumber == pageNumber. ToString()))
+            if (refNo == 0 && products.Any(p => p.Code == code && p.PageNumber == pageNumber.ToString()))
             {
                 Console.WriteLine($"   🔄 Duplicate (Code): Code={code}");
                 return false;
             }
 
-            products.Add(new Product
+            products.Add(new DomainProduct
             {
-                Id = Guid.NewGuid(),
+                Id = Guid. NewGuid(),
                 CatalogId = catalogId,
                 Code = code,
                 Name = name,
@@ -674,5 +854,7 @@ namespace Katalogcu.API. Services
 
             return true;
         }
+
+        #endregion
     }
 }

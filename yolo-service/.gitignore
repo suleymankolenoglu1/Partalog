@@ -1,0 +1,5 @@
+# Python ignore
+__pycache__/
+*.py[cod]
+.venv/
+env/
