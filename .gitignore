@@ -1,0 +1,56 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/Debug/
+**/Release/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+**/node_modules/
+**/dist/
+**/.angular/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+*.key.json
+google-key.json
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
