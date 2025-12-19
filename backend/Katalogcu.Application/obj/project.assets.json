@@ -27,19 +27,19 @@
     ]
   },
   "packageFolders": {
-    "/Users/suleymankolenoglu/.nuget/packages/": {}
+    "/home/runner/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj",
+      "projectUniqueName": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj",
       "projectName": "Katalogcu.Application",
-      "projectPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj",
-      "packagesPath": "/Users/suleymankolenoglu/.nuget/packages/",
-      "outputPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Application/obj/",
+      "projectPath": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj",
+      "packagesPath": "/home/runner/.nuget/packages/",
+      "outputPath": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Application/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/suleymankolenoglu/.nuget/NuGet/NuGet.Config"
+        "/home/runner/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
@@ -51,8 +51,8 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {
-              "projectPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj"
+            "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {
+              "projectPath": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj"
             }
           }
         }
@@ -67,7 +67,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.100"
     },
     "frameworks": {
       "net9.0": {
@@ -88,7 +88,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.302/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.101/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

@@ -64,15 +64,15 @@ python api.py
 - ✅ Kullanıcı kimlik doğrulama (JWT)
 - ✅ PDF yükleme ve işleme
 - ✅ Excel export
-- ✅ AI destekli ürün tanıma (YOLO)
-- ✅ Otomatik hotspot oluşturma
+- ✅ **YOLO AI entegrasyonu** - Backend ile tam entegre
+- ✅ **Otomatik hotspot tespiti** - YOLO servisi üzerinden
 - ✅ OCR desteği
 
 ## 🛠️ Teknolojiler
 
-- **Backend**: .NET 9, Entity Framework Core, PostgreSQL
+- **Backend**: .NET 9, Entity Framework Core, PostgreSQL, HttpClient
 - **Frontend**: Angular, TypeScript
-- **AI**: Python, YOLO, OpenCV
+- **AI**: Python, YOLO, FastAPI, OpenCV
 - **DevOps**: Docker, Docker Compose
 
 ## 📖 API Dokümantasyonu

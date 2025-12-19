@@ -32,9 +32,12 @@ backend/Katalogcu.API/
 ├── Services/
 │   ├── PdfService.cs             # PDF işlemleri
 │   ├── ExcelService.cs           # Excel export işlemleri
-│   └── CloudOcrService.cs        # OCR (Optik Karakter Tanıma) servisi
+│   ├── CloudOcrService.cs        # OCR (Optik Karakter Tanıma) servisi
+│   └── YoloService.cs            # YOLO AI servisi entegrasyonu (Hotspot tespiti)
 ├── Program.cs                    # Uygulama giriş noktası
 ├── Katalogcu.API.csproj         # Proje yapılandırma dosyası
+├── appsettings.json             # Uygulama yapılandırması
+├── appsettings.Development.json # Geliştirme ortamı yapılandırması
 └── Properties/
     └── launchSettings.json       # Debug ayarları
 ```
@@ -44,6 +47,7 @@ backend/Katalogcu.API/
 - Swagger/OpenAPI dokümantasyonu
 - CORS desteği (Angular için)
 - PostgreSQL veritabanı entegrasyonu
+- **YOLO AI servisi entegrasyonu** (Otomatik hotspot tespiti)
 
 #### 2. **Katalogcu.Domain** (Domain Katmanı)
 ```
@@ -123,7 +127,7 @@ frontend/katalogcu-frontend/      # Angular uygulaması (Henüz geliştirilme a�
 
 ```
 yolo-service/
-├── api.py                        # Flask/FastAPI API endpoint
+├── api.py                        # FastAPI API endpoint
 ├── app/
 │   └── main.py                   # Ana uygulama logic
 ├── best.pt                       # Eğitilmiş YOLO model dosyası
@@ -134,9 +138,21 @@ yolo-service/
 
 **Özellikler:**
 - YOLO (You Only Look Once) object detection
-- REST API endpoint'leri
+- FastAPI REST API
 - Ürün tanıma ve koordinat belirleme
 - Katalog sayfalarında otomatik hotspot oluşturma
+- **Backend entegrasyonu** (.NET API ile tam entegre)
+
+**API Endpoints:**
+- `GET /` - Servis bilgisi
+- `GET /health` - Sağlık kontrolü
+- `POST /detect` - Hotspot tespiti (görüntü dosyası alır)
+
+**Backend Entegrasyonu:**
+YOLO servisi artık Katalogcu backend'i ile tamamen entegre edilmiştir:
+- `YoloService` sınıfı üzerinden HTTP istekleri
+- Otomatik hotspot tespiti: `POST /api/hotspots/detect/{pageId}`
+- Tespit edilen hotspot'lar otomatik olarak veritabanına kaydedilir
 
 ---
 
@@ -177,9 +193,8 @@ backend/Katalogcu.sln             # .NET Solution dosyası
 - `DELETE /api/products/{id}` - Ürün sil
 
 #### Hotspots
-- `GET /api/hotspots` - Hotspot'ları listele
-- `POST /api/hotspots` - Yeni hotspot ekle
-- `PUT /api/hotspots/{id}` - Hotspot güncelle
+- `POST /api/hotspots/detect/{pageId}` - **YOLO ile otomatik hotspot tespiti** 🆕
+- `POST /api/hotspots` - Manuel hotspot ekle
 - `DELETE /api/hotspots/{id}` - Hotspot sil
 
 #### Files
@@ -270,10 +285,10 @@ python api.py
 
 ## 📦 Dosya Sayıları
 
-- **C# Dosyaları**: Controllers (6), Services (3), Entities (5), Migrations (11)
-- **Python Dosyaları**: 2 (API ve ML logic)
+- **C# Dosyaları**: Controllers (6), Services (4), Entities (5), Migrations (11)
+- **Python Dosyaları**: 2 (YOLO API ve ML logic)
 - **Angular Projesi**: Henüz geliştirilme aşamasında
-- **Config Dosyaları**: Docker, .NET project files (4), Python requirements
+- **Config Dosyaları**: Docker, .NET project files (4), appsettings.json, Python requirements
 
 ---
 
@@ -281,8 +296,12 @@ python api.py
 
 **Evet, repodaki tüm dosyalar görülebiliyor ve erişilebilir durumda!**
 
+**YOLO servisi artık projeye tamamen entegre edilmiştir! 🎉**
+
 Bu proje, modern web uygulama geliştirme standartlarına uygun olarak:
 - Clean Architecture prensiplerine göre yapılandırılmış
+- **YOLO AI servisi backend ile tam entegre** (YoloService sınıfı ile)
+- **Otomatik hotspot tespiti** endpoint'i eklenmiş
 - Mikroservis mimarisine uygun (Backend, Frontend, AI Service ayrımı)
 - Docker ile containerize edilmiş
 - AI/ML entegrasyonuna sahip (YOLO)

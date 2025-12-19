@@ -14,6 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<CloudOcrService>();
+
+// YOLO servisi için HttpClient ve servis kaydı
+builder.Services.AddHttpClient<YoloService>();
+builder.Services.AddScoped<YoloService>();
+
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     // İlişkisel verilerde sonsuz döngüyü engeller (Parent -> Child -> Parent)

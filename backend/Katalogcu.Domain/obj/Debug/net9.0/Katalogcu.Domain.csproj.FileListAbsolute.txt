@@ -10,3 +10,15 @@
 /Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.pdb
 /Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/ref/Katalogcu.Domain.dll
 /Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.sourcelink.json
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/bin/Debug/net9.0/Katalogcu.Domain.deps.json
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/bin/Debug/net9.0/Katalogcu.Domain.dll
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/bin/Debug/net9.0/Katalogcu.Domain.pdb
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.AssemblyInfoInputs.cache
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.AssemblyInfo.cs
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.csproj.CoreCompileInputs.cache
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.sourcelink.json
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.dll
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/refint/Katalogcu.Domain.dll
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.pdb
+/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/ref/Katalogcu.Domain.dll
