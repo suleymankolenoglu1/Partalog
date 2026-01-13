@@ -1,0 +1,39 @@
+# ============================================
+# PARTALOG AI SERVICE - Dependencies
+# ============================================
+
+# Web Framework
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+
+# AI/ML - YOLO
+ultralytics==8.1.24
+torch==2.2.0
+torchvision==0.17.0
+
+# OCR
+easyocr==1.7.1
+
+# Embedding (CLIP)
+open-clip-torch==2.24.0
+
+# Segmentation (SAM)
+segment-anything==1.0
+# SAM model dosyasını ayrıca indirmen gerekecek
+
+# Vector Database
+chromadb==0.4.24
+
+# Image Processing
+opencv-python-headless==4.9.0.80
+pillow==10.2.0
+numpy==1.26.4
+
+# Utilities
+pydantic==2.6.1
+pydantic-settings==2.2.1
+python-dotenv==1.0.1
+
+# Logging
+loguru==0.7.2

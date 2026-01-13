@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {}
+    "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {}
   },
   "projects": {
-    "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {
+    "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj",
+        "projectUniqueName": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj",
         "projectName": "Katalogcu.Domain",
-        "projectPath": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/",
+        "projectPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj",
+        "packagesPath": "/Users/suleymankolenoglu/.nuget/packages/",
+        "outputPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "/Users/suleymankolenoglu/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
@@ -38,7 +38,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net9.0": {
@@ -59,7 +59,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

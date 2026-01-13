@@ -373,3 +373,4 @@
 /home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.API/obj/Debug/net9.0/Katalogcu.API.genruntimeconfig.cache
 /home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.API/obj/Debug/net9.0/ref/Katalogcu.API.dll
 /home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.API/bin/Debug/net9.0/appsettings.example.json
+/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.API/bin/Debug/net9.0/appsettings.example.json

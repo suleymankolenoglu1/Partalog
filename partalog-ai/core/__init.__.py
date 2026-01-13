@@ -1,0 +1,1 @@
+"""Core modules - AI işleme modülleri."""
