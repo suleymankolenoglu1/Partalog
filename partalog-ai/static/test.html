@@ -1,0 +1,555 @@
+
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Partalog AI - Test</title>
+    <style>
+        * {
+            margin:  0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family:  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00d9ff;
+        }
+        
+        .upload-section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .upload-area {
+            border:  2px dashed #00d9ff;
+            border-radius:  12px;
+            padding: 40px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            background: rgba(0, 217, 255, 0.1);
+        }
+        
+        .upload-area.dragover {
+            background: rgba(0, 217, 255, 0.2);
+            border-color:  #00ff88;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .btn {
+            background:  linear-gradient(135deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor:  not-allowed;
+            transform: none;
+        }
+        
+        .results-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap:  20px;
+        }
+        
+        @media (max-width: 1000px) {
+            .results-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .panel h2 {
+            color: #00d9ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .image-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+            background: #0f0f23;
+        }
+        
+        #catalogImage {
+            width: 100%;
+            display: block;
+        }
+        
+        .hotspot {
+            position:  absolute;
+            border:  2px solid #00ff88;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size:  10px;
+            font-weight: bold;
+            color: #00ff88;
+            background: rgba(0, 255, 136, 0.2);
+        }
+        
+        .hotspot:hover {
+            transform: scale(1.3);
+            background:  rgba(0, 255, 136, 0.5);
+            z-index: 100;
+        }
+        
+        .hotspot.selected {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+        }
+        
+        .part-box {
+            position: absolute;
+            border: 2px solid #ffd93d;
+            background: rgba(255, 217, 61, 0.1);
+            pointer-events: none;
+        }
+        
+        .parts-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .part-item {
+            background: #0f0f23;
+            border-radius: 8px;
+            padding:  12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .part-item:hover {
+            border-color: #00d9ff;
+        }
+        
+        .part-item.selected {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+        
+        .part-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .part-details {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background:  #0f0f23;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00d9ff;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top:  5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top-color: #00d9ff;
+            border-radius: 50%;
+            animation:  spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display:  none;
+        }
+        
+        .toggle-parts {
+            margin-bottom: 10px;
+        }
+        
+        .toggle-parts label {
+            margin-right: 15px;
+            cursor: pointer;
+        }
+        
+        .toggle-parts input {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Partalog AI - Test Sayfası</h1>
+        
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <p>📁 Teknik resmi sürükle bırak veya tıkla</p>
+                <p style="color: #888; margin-top: 10px; font-size: 14px;">JPG, PNG formatları desteklenir</p>
+            </div>
+            <input type="file" id="fileInput" accept="image/*">
+            <br>
+            <button class="btn" id="processBtn" disabled>🚀 AI ile İşle</button>
+        </div>
+        
+        <!-- Loading -->
+        <div class="loading hidden" id="loading">
+            <div class="spinner"></div>
+            <p>AI modelleri çalışıyor...  Bu işlem 20-30 saniye sürebilir. </p>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="results-section hidden" id="results">
+            <!-- Stats -->
+            <div class="panel" style="grid-column: 1 / -1;">
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-value" id="statBalloons">0</div>
+                        <div class="stat-label">Balloon</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statSegments">0</div>
+                        <div class="stat-label">Segment</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statTime">0</div>
+                        <div class="stat-label">Süre (sn)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statSuccess">0%</div>
+                        <div class="stat-label">Başarı</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Image with Hotspots -->
+            <div class="panel">
+                <h2>📍 Tespit Edilen Parçalar</h2>
+                <div class="toggle-parts">
+                    <label><input type="checkbox" id="showHotspots" checked> Balloon'ları Göster</label>
+                    <label><input type="checkbox" id="showParts"> Parça Sınırlarını Göster</label>
+                </div>
+                <div class="image-container" id="imageContainer">
+                    <img id="catalogImage" src="" alt="Katalog">
+                    <div id="hotspotsLayer"></div>
+                    <div id="partsLayer"></div>
+                </div>
+            </div>
+            
+            <!-- Parts List -->
+            <div class="panel">
+                <h2>📋 Parça Listesi</h2>
+                <div class="parts-list" id="partsList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        
+        let selectedFile = null;
+        let partsData = [];
+        
+        // Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const catalogImage = document.getElementById('catalogImage');
+        const hotspotsLayer = document. getElementById('hotspotsLayer');
+        const partsLayer = document.getElementById('partsLayer');
+        const partsList = document.getElementById('partsList');
+        const showHotspots = document.getElementById('showHotspots');
+        const showParts = document. getElementById('showParts');
+        
+        // Upload Area Events
+        uploadArea. addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList. add('dragover');
+        });
+        
+        uploadArea. addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target. files[0]) {
+                handleFile(e. target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            selectedFile = file;
+            uploadArea.innerHTML = `<p>✅ ${file.name}</p><p style="color: #00ff88; margin-top: 10px;">Dosya hazır! </p>`;
+            processBtn.disabled = false;
+        }
+        
+        // Process Button
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            // Show loading
+            loading. classList.remove('hidden');
+            results.classList.add('hidden');
+            processBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                
+                const response = await fetch(`${API_URL}/catalog/process? extract_embeddings=true&save_to_db=false`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (! response.ok) {
+                    throw new Error('API hatası: ' + response.status);
+                }
+                
+                const data = await response.json();
+                displayResults(data);
+                
+            } catch (error) {
+                alert('Hata: ' + error. message);
+                console.error(error);
+            } finally {
+                loading.classList.add('hidden');
+                processBtn.disabled = false;
+            }
+        });
+        
+        function displayResults(data) {
+            partsData = data. parts;
+            
+            // Stats
+            document.getElementById('statBalloons').textContent = data.part_count;
+            document.getElementById('statSegments').textContent = data.segments_found || 0;
+            document.getElementById('statTime').textContent = (data.processing_time_ms / 1000).toFixed(1);
+            
+            const successRate = data.segments_found ?  
+                Math.round((data.segments_found / data.part_count) * 100) : 0;
+            document. getElementById('statSuccess').textContent = successRate + '%';
+            
+            // Show image
+            const imageUrl = URL.createObjectURL(selectedFile);
+            catalogImage.src = imageUrl;
+            
+            catalogImage.onload = () => {
+                renderHotspots(data.parts, data.image_width, data.image_height);
+                renderPartBoxes(data.parts, data.image_width, data.image_height);
+                renderPartsList(data.parts);
+            };
+            
+            results.classList.remove('hidden');
+        }
+        
+        function renderHotspots(parts, imgWidth, imgHeight) {
+            hotspotsLayer. innerHTML = '';
+            
+            const containerWidth = catalogImage.clientWidth;
+            const containerHeight = catalogImage.clientHeight;
+            const scaleX = containerWidth / imgWidth;
+            const scaleY = containerHeight / imgHeight;
+            
+            parts.forEach((part, index) => {
+                const hotspot = document.createElement('div');
+                hotspot.className = 'hotspot';
+                hotspot. dataset.index = index;
+                
+                const bbox = part.balloon.bbox;
+                const width = (bbox. x2 - bbox. x1) * scaleX;
+                const height = (bbox.y2 - bbox. y1) * scaleY;
+                
+                hotspot. style.left = (bbox.x1 * scaleX) + 'px';
+                hotspot.style.top = (bbox.y1 * scaleY) + 'px';
+                hotspot.style.width = width + 'px';
+                hotspot.style.height = height + 'px';
+                hotspot.textContent = part.part_number || '?';
+                
+                hotspot.addEventListener('click', () => selectPart(index));
+                
+                hotspotsLayer.appendChild(hotspot);
+            });
+        }
+        
+        function renderPartBoxes(parts, imgWidth, imgHeight) {
+            partsLayer.innerHTML = '';
+            
+            const containerWidth = catalogImage.clientWidth;
+            const containerHeight = catalogImage.clientHeight;
+            const scaleX = containerWidth / imgWidth;
+            const scaleY = containerHeight / imgHeight;
+            
+            parts.forEach((part, index) => {
+                if (! part.part) return;
+                
+                const box = document.createElement('div');
+                box.className = 'part-box';
+                box.dataset.index = index;
+                
+                const bbox = part.part.bbox;
+                box.style.left = (bbox.x * scaleX) + 'px';
+                box.style. top = (bbox. y * scaleY) + 'px';
+                box. style.width = (bbox.width * scaleX) + 'px';
+                box.style.height = (bbox.height * scaleY) + 'px';
+                
+                partsLayer.appendChild(box);
+            });
+            
+            partsLayer.style. display = showParts. checked ? 'block' : 'none';
+        }
+        
+        function renderPartsList(parts) {
+            partsList.innerHTML = '';
+            
+            parts. forEach((part, index) => {
+                const item = document.createElement('div');
+                item.className = 'part-item';
+                item.dataset. index = index;
+                
+                const hasSegment = part.part !== null;
+                const segmentInfo = hasSegment ?  
+                    `✅ Segment bulundu (${part.part. area} px²)` : 
+                    '❌ Segment bulunamadı';
+                
+                item.innerHTML = `
+                    <div class="part-number">#${part.part_number || '?'}</div>
+                    <div class="part-details">
+                        Balloon: (${Math.round(part. balloon.center. x)}, ${Math.round(part.balloon. center.y)})<br>
+                        Güven: ${(part.balloon.confidence * 100).toFixed(1)}%<br>
+                        ${segmentInfo}<br>
+                        Embedding: ${part.has_embedding ? '✅' : '❌'}
+                    </div>
+                `;
+                
+                item.addEventListener('click', () => selectPart(index));
+                
+                partsList. appendChild(item);
+            });
+        }
+        
+        function selectPart(index) {
+            // Deselect all
+            document.querySelectorAll('.hotspot').forEach(h => h.classList. remove('selected'));
+            document.querySelectorAll('.part-item').forEach(p => p.classList. remove('selected'));
+            
+            // Select current
+            const hotspot = document.querySelector(`.hotspot[data-index="${index}"]`);
+            const partItem = document.querySelector(`.part-item[data-index="${index}"]`);
+            
+            if (hotspot) hotspot.classList.add('selected');
+            if (partItem) {
+                partItem. classList.add('selected');
+                partItem.scrollIntoView({ behavior:  'smooth', block: 'nearest' });
+            }
+        }
+        
+        // Toggle visibility
+        showHotspots.addEventListener('change', () => {
+            hotspotsLayer. style.display = showHotspots. checked ? 'block' : 'none';
+        });
+        
+        showParts.addEventListener('change', () => {
+            partsLayer.style.display = showParts. checked ? 'block' : 'none';
+        });
+        
+        // Resize handler
+        window.addEventListener('resize', () => {
+            if (partsData.length > 0) {
+                const img = catalogImage;
+                renderHotspots(partsData, img.naturalWidth, img.naturalHeight);
+                renderPartBoxes(partsData, img. naturalWidth, img. naturalHeight);
+            }
+        });
+    </script>
+</body>
+</html>
