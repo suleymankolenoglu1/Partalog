@@ -1,1 +1,0 @@
-"""Services - İş mantığı servisleri."""

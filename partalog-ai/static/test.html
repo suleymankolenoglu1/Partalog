@@ -1,11 +1,9 @@
-
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Partalog AI - Test</title>
+    <title>Partalog AI - Hotspot & OCR Test</title>
     <style>
         * {
             margin:  0;
@@ -15,105 +13,210 @@
         
         body {
             font-family:  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a2e;
+            background:  linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: #eee;
             min-height: 100vh;
             padding: 20px;
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
         
         h1 {
-            text-align: center;
-            margin-bottom: 30px;
+            text-align:  center;
+            margin-bottom: 10px;
             color: #00d9ff;
+            font-size: 28px;
         }
         
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        /* Upload Section */
         .upload-section {
             background: #16213e;
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 30px;
             margin-bottom: 30px;
-            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
         
         .upload-area {
             border:  2px dashed #00d9ff;
-            border-radius:  12px;
-            padding: 40px;
+            border-radius: 12px;
+            padding: 50px;
             cursor: pointer;
             transition: all 0.3s;
+            text-align: center;
         }
         
         .upload-area:hover {
             background: rgba(0, 217, 255, 0.1);
+            border-color: #00ff88;
         }
         
         .upload-area.dragover {
             background: rgba(0, 217, 255, 0.2);
             border-color:  #00ff88;
+            transform: scale(1.02);
+        }
+        
+        .upload-area.has-file {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
         }
         
         #fileInput {
             display: none;
         }
         
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display:  flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-group label {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100px;
+        }
+        
+        .control-group input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            border-radius: 5px;
+            border:  1px solid #444;
+            background:  #0f0f23;
+            color: #fff;
+            text-align: center;
+        }
+        
         .btn {
-            background:  linear-gradient(135deg, #00d9ff, #00ff88);
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
             color: #1a1a2e;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 8px;
+            border:  none;
+            padding: 14px 40px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 20px;
-            transition: transform 0.2s;
+            transition:  all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .btn:hover {
-            transform: scale(1.05);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
         }
         
         .btn:disabled {
             opacity: 0.5;
             cursor:  not-allowed;
             transform: none;
+            box-shadow: none;
         }
         
+        /* Stats Section */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        @media (max-width: 768px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .stat-box {
+            background:  #0f0f23;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #00d9ff;
+        }
+        
+        .stat-value.success {
+            color:  #00ff88;
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            color: #888;
+            margin-top:  5px;
+        }
+        
+        /* Results Section */
         .results-section {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap:  20px;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
         }
         
-        @media (max-width: 1000px) {
+        @media (max-width: 1200px) {
             .results-section {
                 grid-template-columns: 1fr;
             }
         }
         
         .panel {
-            background: #16213e;
-            border-radius: 12px;
+            background:  #16213e;
+            border-radius: 16px;
             padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
         
         .panel h2 {
             color: #00d9ff;
             margin-bottom: 15px;
             font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap:  10px;
         }
         
+        /* Image Container */
         .image-container {
             position: relative;
             width: 100%;
             overflow: hidden;
-            border-radius: 8px;
+            border-radius: 12px;
             background: #0f0f23;
+            border: 1px solid #333;
         }
         
         #catalogImage {
@@ -121,114 +224,179 @@
             display: block;
         }
         
-        .hotspot {
-            position:  absolute;
-            border:  2px solid #00ff88;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size:  10px;
-            font-weight: bold;
-            color: #00ff88;
-            background: rgba(0, 255, 136, 0.2);
-        }
-        
-        .hotspot:hover {
-            transform: scale(1.3);
-            background:  rgba(0, 255, 136, 0.5);
-            z-index: 100;
-        }
-        
-        .hotspot.selected {
-            border-color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.3);
-            color: #ff6b6b;
-        }
-        
-        .part-box {
+        .hotspots-layer {
             position: absolute;
-            border: 2px solid #ffd93d;
-            background: rgba(255, 217, 61, 0.1);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height:  100%;
             pointer-events: none;
         }
         
+        .hotspot {
+            position: absolute;
+            border:  3px solid #00ff88;
+            border-radius: 50%;
+            cursor: pointer;
+            pointer-events: auto;
+            transition:  all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size:  11px;
+            font-weight: bold;
+            color: #fff;
+            background:  rgba(0, 0, 0, 0.6);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        
+        .hotspot:hover {
+            transform: scale(1.4);
+            background: rgba(0, 255, 136, 0.8);
+            color: #000;
+            z-index: 100;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .hotspot.selected {
+            border-color:  #ff6b6b;
+            background: rgba(255, 107, 107, 0.8);
+            color:  #fff;
+            transform: scale(1.3);
+            z-index: 99;
+            animation: pulse 1s infinite;
+        }
+        
+        .hotspot.no-label {
+            border-color: #ffd93d;
+            background: rgba(255, 217, 61, 0.3);
+            color:  #ffd93d;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.5); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+        }
+        
+        /* Parts List */
         .parts-list {
-            max-height: 500px;
+            max-height: 600px;
             overflow-y: auto;
+        }
+        
+        .parts-list::-webkit-scrollbar {
+            width:  8px;
+        }
+        
+        .parts-list::-webkit-scrollbar-track {
+            background: #0f0f23;
+            border-radius: 4px;
+        }
+        
+        .parts-list::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+        
+        .parts-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
         
         .part-item {
             background: #0f0f23;
-            border-radius: 8px;
-            padding:  12px;
+            border-radius: 10px;
+            padding: 15px;
             margin-bottom: 10px;
             cursor: pointer;
             transition: all 0.2s;
             border: 2px solid transparent;
+            display:  flex;
+            align-items: center;
+            gap: 15px;
         }
         
         .part-item:hover {
             border-color: #00d9ff;
+            transform: translateX(5px);
         }
         
         .part-item.selected {
-            border-color: #00ff88;
-            background: rgba(0, 255, 136, 0.1);
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.15);
         }
         
-        .part-number {
-            font-size: 24px;
+        .part-item.no-label {
+            border-left: 4px solid #ffd93d;
+        }
+        
+        .part-number-badge {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00ff88, #00d9ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size:  18px;
+            font-weight: bold;
+            color: #1a1a2e;
+            flex-shrink: 0;
+        }
+        
+        .part-number-badge.no-label {
+            background: linear-gradient(135deg, #ffd93d, #ff9800);
+        }
+        
+        .part-info {
+            flex:  1;
+        }
+        
+        .part-info .label-text {
+            font-size: 20px;
             font-weight: bold;
             color: #00ff88;
+        }
+        
+        .part-info .label-text.no-label {
+            color: #ffd93d;
         }
         
         .part-details {
             font-size: 12px;
             color: #888;
-            margin-top: 5px;
-        }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-box {
-            background:  #0f0f23;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 28px;
-            font-weight: bold;
-            color: #00d9ff;
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            color: #888;
             margin-top:  5px;
+            line-height: 1.6;
         }
         
+        .confidence-bar {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height:  100%;
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        
+        /* Loading */
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 60px;
         }
         
         .spinner {
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             border: 4px solid #333;
             border-top-color: #00d9ff;
             border-radius: 50%;
-            animation:  spin 1s linear infinite;
+            animation: spin 1s linear infinite;
             margin: 0 auto 20px;
         }
         
@@ -237,86 +405,169 @@
         }
         
         .hidden {
-            display:  none;
+            display:  none ! important;
         }
         
-        .toggle-parts {
-            margin-bottom: 10px;
+        /* Selected Info Panel */
+        .selected-info {
+            background: #0f0f23;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 2px solid #ff6b6b;
         }
         
-        .toggle-parts label {
-            margin-right: 15px;
-            cursor: pointer;
+        .selected-info h3 {
+            color: #ff6b6b;
+            margin-bottom: 15px;
+            font-size: 16px;
         }
         
-        .toggle-parts input {
-            margin-right: 5px;
+        .selected-info.info-grid {
+            display:  grid;
+            grid-template-columns:  1fr 1fr;
+            gap: 10px;
+        }
+        
+        .selected-info.info-item {
+            font-size: 13px;
+        }
+        
+        .selected-info.info-label {
+            color:  #888;
+        }
+        
+        .selected-info.info-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align:  center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state.icon {
+            font-size: 48px;
+            margin-bottom: 15px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔧 Partalog AI - Test Sayfası</h1>
+        <h1>🔍 Partalog AI - Hotspot & OCR Test</h1>
+        <p class="subtitle">YOLO ile hotspot tespiti + EasyOCR ile numara okuma</p>
         
         <!-- Upload Section -->
         <div class="upload-section">
             <div class="upload-area" id="uploadArea">
-                <p>📁 Teknik resmi sürükle bırak veya tıkla</p>
+                <div class="upload-icon">📁</div>
+                <p style="font-size: 18px;">Teknik resmi sürükle bırak veya tıkla</p>
                 <p style="color: #888; margin-top: 10px; font-size: 14px;">JPG, PNG formatları desteklenir</p>
             </div>
             <input type="file" id="fileInput" accept="image/*">
-            <br>
-            <button class="btn" id="processBtn" disabled>🚀 AI ile İşle</button>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>Güven Eşiği: </label>
+                    <input type="range" id="confidenceRange" min="0" max="100" value="25">
+                    <input type="number" id="confidenceValue" min="0" max="100" value="25">
+                    <span>%</span>
+                </div>
+                <div class="control-group">
+                    <label>OCR Padding:</label>
+                    <input type="number" id="paddingValue" min="0" max="20" value="5">
+                    <span>px</span>
+                </div>
+                <button class="btn" id="processBtn" disabled>
+                    <span>🚀</span>
+                    <span>Hotspot Tespit Et</span>
+                </button>
+            </div>
         </div>
         
         <!-- Loading -->
         <div class="loading hidden" id="loading">
             <div class="spinner"></div>
-            <p>AI modelleri çalışıyor...  Bu işlem 20-30 saniye sürebilir. </p>
+            <p style="font-size: 18px;">YOLO + OCR çalışıyor... </p>
+            <p style="color: #888; margin-top:  10px;">Bu işlem birkaç saniye sürebilir</p>
         </div>
         
         <!-- Results Section -->
-        <div class="results-section hidden" id="results">
+        <div class="hidden" id="results">
             <!-- Stats -->
-            <div class="panel" style="grid-column: 1 / -1;">
-                <div class="stats">
-                    <div class="stat-box">
-                        <div class="stat-value" id="statBalloons">0</div>
-                        <div class="stat-label">Balloon</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="statSegments">0</div>
-                        <div class="stat-label">Segment</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="statTime">0</div>
-                        <div class="stat-label">Süre (sn)</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="statSuccess">0%</div>
-                        <div class="stat-label">Başarı</div>
-                    </div>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="statHotspots">0</div>
+                    <div class="stat-label">Tespit Edilen Hotspot</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value success" id="statLabeled">0</div>
+                    <div class="stat-label">OCR ile Okunan</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="statSuccess">0%</div>
+                    <div class="stat-label">OCR Başarı Oranı</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="statTime">0</div>
+                    <div class="stat-label">İşlem Süresi (ms)</div>
                 </div>
             </div>
             
-            <!-- Image with Hotspots -->
-            <div class="panel">
-                <h2>📍 Tespit Edilen Parçalar</h2>
-                <div class="toggle-parts">
-                    <label><input type="checkbox" id="showHotspots" checked> Balloon'ları Göster</label>
-                    <label><input type="checkbox" id="showParts"> Parça Sınırlarını Göster</label>
+            <div class="results-section">
+                <!-- Image with Hotspots -->
+                <div class="panel">
+                    <h2>📍 Tespit Edilen Hotspotlar</h2>
+                    <div class="image-container" id="imageContainer">
+                        <img id="catalogImage" src="" alt="Katalog">
+                        <div class="hotspots-layer" id="hotspotsLayer"></div>
+                    </div>
                 </div>
-                <div class="image-container" id="imageContainer">
-                    <img id="catalogImage" src="" alt="Katalog">
-                    <div id="hotspotsLayer"></div>
-                    <div id="partsLayer"></div>
+                
+                <!-- Parts List -->
+                <div class="panel">
+                    <h2>📋 Hotspot Listesi <span id="listCount" style="color: #888; font-weight: normal;"></span></h2>
+                    <div class="parts-list" id="partsList">
+                        <div class="empty-state">
+                            <div class="icon">🔍</div>
+                            <p>Henüz tespit yapılmadı</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Selected Info -->
+                    <div class="selected-info hidden" id="selectedInfo">
+                        <h3>🎯 Seçili Hotspot Detayları</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Numara: </span>
+                                <span class="info-value" id="infoLabel">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Güven: </span>
+                                <span class="info-value" id="infoConfidence">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Konum (X, Y):</span>
+                                <span class="info-value" id="infoPosition">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Boyut:</span>
+                                <span class="info-value" id="infoSize">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Sol %:</span>
+                                <span class="info-value" id="infoLeft">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Üst %:</span>
+                                <span class="info-value" id="infoTop">-</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Parts List -->
-            <div class="panel">
-                <h2>📋 Parça Listesi</h2>
-                <div class="parts-list" id="partsList"></div>
             </div>
         </div>
     </div>
@@ -325,35 +576,47 @@
         const API_URL = 'http://localhost:8000';
         
         let selectedFile = null;
-        let partsData = [];
+        let hotspotsData = [];
+        let imageWidth = 0;
+        let imageHeight = 0;
+        let selectedIndex = -1;
         
         // Elements
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const processBtn = document.getElementById('processBtn');
+        const processBtn = document. getElementById('processBtn');
         const loading = document.getElementById('loading');
         const results = document.getElementById('results');
         const catalogImage = document.getElementById('catalogImage');
         const hotspotsLayer = document. getElementById('hotspotsLayer');
-        const partsLayer = document.getElementById('partsLayer');
         const partsList = document.getElementById('partsList');
-        const showHotspots = document.getElementById('showHotspots');
-        const showParts = document. getElementById('showParts');
+        const confidenceRange = document. getElementById('confidenceRange');
+        const confidenceValue = document. getElementById('confidenceValue');
+        const paddingValue = document. getElementById('paddingValue');
+        const selectedInfo = document.getElementById('selectedInfo');
+        
+        // Sync confidence inputs
+        confidenceRange.addEventListener('input', () => {
+            confidenceValue.value = confidenceRange.value;
+        });
+        confidenceValue.addEventListener('input', () => {
+            confidenceRange.value = confidenceValue.value;
+        });
         
         // Upload Area Events
         uploadArea. addEventListener('click', () => fileInput.click());
         
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList. add('dragover');
+            uploadArea.classList.add('dragover');
         });
         
-        uploadArea. addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea. classList.remove('dragover');
         });
         
         uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
+            e. preventDefault();
             uploadArea.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
             if (file && file.type.startsWith('image/')) {
@@ -369,7 +632,12 @@
         
         function handleFile(file) {
             selectedFile = file;
-            uploadArea.innerHTML = `<p>✅ ${file.name}</p><p style="color: #00ff88; margin-top: 10px;">Dosya hazır! </p>`;
+            uploadArea.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <p style="font-size: 18px; color: #00ff88;">${file.name}</p>
+                <p style="color:  #888; margin-top: 10px;">Dosya hazır!  İşlem başlatabilirsiniz. </p>
+            `;
+            uploadArea.classList.add('has-file');
             processBtn.disabled = false;
         }
         
@@ -381,25 +649,33 @@
             loading. classList.remove('hidden');
             results.classList.add('hidden');
             processBtn.disabled = true;
+            selectedIndex = -1;
+            
+            const confidence = parseInt(confidenceValue.value) / 100;
+            const padding = parseInt(paddingValue.value);
             
             try {
                 const formData = new FormData();
                 formData.append('file', selectedFile);
                 
-                const response = await fetch(`${API_URL}/catalog/process? extract_embeddings=true&save_to_db=false`, {
-                    method: 'POST',
-                    body: formData
-                });
+                const response = await fetch(
+                    `${API_URL}/api/detect? confidence=${confidence}&padding=${padding}`, 
+                    {
+                        method:  'POST',
+                        body: formData
+                    }
+                );
                 
                 if (! response.ok) {
-                    throw new Error('API hatası: ' + response.status);
+                    const error = await response. json();
+                    throw new Error(error.detail || 'API hatası:  ' + response.status);
                 }
                 
                 const data = await response.json();
                 displayResults(data);
                 
             } catch (error) {
-                alert('Hata: ' + error. message);
+                alert('Hata:  ' + error.message);
                 console.error(error);
             } finally {
                 loading.classList.add('hidden');
@@ -408,147 +684,179 @@
         });
         
         function displayResults(data) {
-            partsData = data. parts;
+            hotspotsData = data.hotspots || [];
+            imageWidth = data.image_width;
+            imageHeight = data.image_height;
             
             // Stats
-            document.getElementById('statBalloons').textContent = data.part_count;
-            document.getElementById('statSegments').textContent = data.segments_found || 0;
-            document.getElementById('statTime').textContent = (data.processing_time_ms / 1000).toFixed(1);
+            document.getElementById('statHotspots').textContent = data.hotspot_count;
+            document.getElementById('statLabeled').textContent = data.labeled_count;
+            document.getElementById('statTime').textContent = data.processing_time_ms. toFixed(0);
             
-            const successRate = data.segments_found ?  
-                Math.round((data.segments_found / data.part_count) * 100) : 0;
-            document. getElementById('statSuccess').textContent = successRate + '%';
+            const successRate = data.hotspot_count > 0 
+                ? Math.round((data.labeled_count / data.hotspot_count) * 100) 
+                : 0;
+            document.getElementById('statSuccess').textContent = successRate + '%';
+            
+            document.getElementById('listCount').textContent = `(${data.hotspot_count} adet)`;
             
             // Show image
             const imageUrl = URL.createObjectURL(selectedFile);
             catalogImage.src = imageUrl;
             
             catalogImage.onload = () => {
-                renderHotspots(data.parts, data.image_width, data.image_height);
-                renderPartBoxes(data.parts, data.image_width, data.image_height);
-                renderPartsList(data.parts);
+                renderHotspots();
+                renderPartsList();
             };
             
             results.classList.remove('hidden');
+            selectedInfo.classList.add('hidden');
         }
         
-        function renderHotspots(parts, imgWidth, imgHeight) {
-            hotspotsLayer. innerHTML = '';
+        function renderHotspots() {
+            hotspotsLayer.innerHTML = '';
             
             const containerWidth = catalogImage.clientWidth;
             const containerHeight = catalogImage.clientHeight;
-            const scaleX = containerWidth / imgWidth;
-            const scaleY = containerHeight / imgHeight;
+            const scaleX = containerWidth / imageWidth;
+            const scaleY = containerHeight / imageHeight;
             
-            parts.forEach((part, index) => {
-                const hotspot = document.createElement('div');
-                hotspot.className = 'hotspot';
-                hotspot. dataset.index = index;
+            hotspotsData. forEach((hotspot, index) => {
+                const div = document.createElement('div');
+                div.className = 'hotspot';
+                if (! hotspot.label) {
+                    div.classList.add('no-label');
+                }
+                if (index === selectedIndex) {
+                    div. classList.add('selected');
+                }
+                div.dataset.index = index;
                 
-                const bbox = part.balloon.bbox;
-                const width = (bbox. x2 - bbox. x1) * scaleX;
-                const height = (bbox.y2 - bbox. y1) * scaleY;
+                const width = hotspot.width * scaleX;
+                const height = hotspot.height * scaleY;
                 
-                hotspot. style.left = (bbox.x1 * scaleX) + 'px';
-                hotspot.style.top = (bbox.y1 * scaleY) + 'px';
-                hotspot.style.width = width + 'px';
-                hotspot.style.height = height + 'px';
-                hotspot.textContent = part.part_number || '?';
+                div. style.left = (hotspot. x1 * scaleX) + 'px';
+                div. style.top = (hotspot.y1 * scaleY) + 'px';
+                div. style.width = width + 'px';
+                div.style.height = height + 'px';
+                div.textContent = hotspot. label || '?';
                 
-                hotspot.addEventListener('click', () => selectPart(index));
+                div.addEventListener('click', () => selectHotspot(index));
                 
-                hotspotsLayer.appendChild(hotspot);
+                hotspotsLayer.appendChild(div);
             });
         }
         
-        function renderPartBoxes(parts, imgWidth, imgHeight) {
-            partsLayer.innerHTML = '';
-            
-            const containerWidth = catalogImage.clientWidth;
-            const containerHeight = catalogImage.clientHeight;
-            const scaleX = containerWidth / imgWidth;
-            const scaleY = containerHeight / imgHeight;
-            
-            parts.forEach((part, index) => {
-                if (! part.part) return;
-                
-                const box = document.createElement('div');
-                box.className = 'part-box';
-                box.dataset.index = index;
-                
-                const bbox = part.part.bbox;
-                box.style.left = (bbox.x * scaleX) + 'px';
-                box.style. top = (bbox. y * scaleY) + 'px';
-                box. style.width = (bbox.width * scaleX) + 'px';
-                box.style.height = (bbox.height * scaleY) + 'px';
-                
-                partsLayer.appendChild(box);
-            });
-            
-            partsLayer.style. display = showParts. checked ? 'block' : 'none';
-        }
-        
-        function renderPartsList(parts) {
+        function renderPartsList() {
             partsList.innerHTML = '';
             
-            parts. forEach((part, index) => {
+            if (hotspotsData.length === 0) {
+                partsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">😕</div>
+                        <p>Hotspot tespit edilemedi</p>
+                        <p style="font-size:  12px; margin-top: 10px;">Güven eşiğini düşürmeyi deneyin</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Numaraya göre sırala (OCR ile okunanlar önce)
+            const sortedHotspots = [... hotspotsData].map((h, i) => ({... h, originalIndex: i}));
+            sortedHotspots.sort((a, b) => {
+                // Önce label olanlar
+                if (a. label && ! b.label) return -1;
+                if (!a.label && b.label) return 1;
+                // Sonra numaraya göre
+                if (a. label && b.label) {
+                    return parseInt(a.label) - parseInt(b. label);
+                }
+                // En son confidence'a göre
+                return b.confidence - a.confidence;
+            });
+            
+            sortedHotspots.forEach((hotspot) => {
+                const index = hotspot.originalIndex;
                 const item = document.createElement('div');
                 item.className = 'part-item';
-                item.dataset. index = index;
+                if (! hotspot.label) {
+                    item.classList.add('no-label');
+                }
+                if (index === selectedIndex) {
+                    item.classList.add('selected');
+                }
+                item. dataset.index = index;
                 
-                const hasSegment = part.part !== null;
-                const segmentInfo = hasSegment ?  
-                    `✅ Segment bulundu (${part.part. area} px²)` : 
-                    '❌ Segment bulunamadı';
+                const labelText = hotspot.label || '?';
+                const confidencePercent = (hotspot.confidence * 100).toFixed(1);
                 
                 item.innerHTML = `
-                    <div class="part-number">#${part.part_number || '?'}</div>
-                    <div class="part-details">
-                        Balloon: (${Math.round(part. balloon.center. x)}, ${Math.round(part.balloon. center.y)})<br>
-                        Güven: ${(part.balloon.confidence * 100).toFixed(1)}%<br>
-                        ${segmentInfo}<br>
-                        Embedding: ${part.has_embedding ? '✅' : '❌'}
+                    <div class="part-number-badge ${! hotspot.label ?  'no-label' : ''}">${labelText}</div>
+                    <div class="part-info">
+                        <div class="label-text ${! hotspot.label ?  'no-label' : ''}">
+                            ${hotspot.label ?  `Numara: ${hotspot.label}` : 'OCR Okunamadı'}
+                        </div>
+                        <div class="part-details">
+                            Konum: (${hotspot.center_x. toFixed(0)}, ${hotspot.center_y. toFixed(0)}) &nbsp;|&nbsp;
+                            Boyut: ${hotspot.width. toFixed(0)}x${hotspot.height. toFixed(0)} px
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${confidencePercent}%"></div>
+                        </div>
+                        <div class="part-details" style="margin-top: 4px;">
+                            Güven: ${confidencePercent}%
+                        </div>
                     </div>
                 `;
                 
-                item.addEventListener('click', () => selectPart(index));
+                item.addEventListener('click', () => selectHotspot(index));
                 
-                partsList. appendChild(item);
+                partsList.appendChild(item);
             });
         }
         
-        function selectPart(index) {
-            // Deselect all
-            document.querySelectorAll('.hotspot').forEach(h => h.classList. remove('selected'));
-            document.querySelectorAll('.part-item').forEach(p => p.classList. remove('selected'));
+        function selectHotspot(index) {
+            selectedIndex = index;
             
-            // Select current
-            const hotspot = document.querySelector(`.hotspot[data-index="${index}"]`);
-            const partItem = document.querySelector(`.part-item[data-index="${index}"]`);
+            // Update hotspots on image
+            document.querySelectorAll('.hotspot').forEach(h => {
+                h.classList.toggle('selected', parseInt(h.dataset. index) === index);
+            });
             
-            if (hotspot) hotspot.classList.add('selected');
-            if (partItem) {
-                partItem. classList.add('selected');
-                partItem.scrollIntoView({ behavior:  'smooth', block: 'nearest' });
+            // Update list items
+            document.querySelectorAll('.part-item').forEach(p => {
+                p.classList.toggle('selected', parseInt(p.dataset. index) === index);
+            });
+            
+            // Scroll to selected item in list
+            const selectedItem = document.querySelector(`.part-item[data-index="${index}"]`);
+            if (selectedItem) {
+                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            
+            // Show selected info
+            const hotspot = hotspotsData[index];
+            if (hotspot) {
+                document.getElementById('infoLabel').textContent = hotspot.label || 'Okunamadı';
+                document.getElementById('infoConfidence').textContent = (hotspot.confidence * 100).toFixed(2) + '%';
+                document.getElementById('infoPosition').textContent = `(${hotspot.center_x.toFixed(1)}, ${hotspot.center_y. toFixed(1)})`;
+                document.getElementById('infoSize').textContent = `${hotspot.width. toFixed(0)} x ${hotspot. height.toFixed(0)} px`;
+                document.getElementById('infoLeft').textContent = hotspot.left_percent. toFixed(2) + '%';
+                document.getElementById('infoTop').textContent = hotspot. top_percent.toFixed(2) + '%';
+                
+                selectedInfo.classList.remove('hidden');
             }
         }
         
-        // Toggle visibility
-        showHotspots.addEventListener('change', () => {
-            hotspotsLayer. style.display = showHotspots. checked ? 'block' : 'none';
-        });
-        
-        showParts.addEventListener('change', () => {
-            partsLayer.style.display = showParts. checked ? 'block' : 'none';
-        });
-        
         // Resize handler
+        let resizeTimeout;
         window.addEventListener('resize', () => {
-            if (partsData.length > 0) {
-                const img = catalogImage;
-                renderHotspots(partsData, img.naturalWidth, img.naturalHeight);
-                renderPartBoxes(partsData, img. naturalWidth, img. naturalHeight);
-            }
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (hotspotsData. length > 0) {
+                    renderHotspots();
+                }
+            }, 100);
         });
     </script>
 </body>

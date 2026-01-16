@@ -1,5 +1,5 @@
 # ============================================
-# PARTALOG AI SERVICE - Dependencies
+# PARTALOG AI SERVICE - Dependencies (Basitleştirilmiş)
 # ============================================
 
 # Web Framework
@@ -14,16 +14,6 @@ torchvision==0.17.0
 
 # OCR
 easyocr==1.7.1
-
-# Embedding (CLIP)
-open-clip-torch==2.24.0
-
-# Segmentation (SAM)
-segment-anything==1.0
-# SAM model dosyasını ayrıca indirmen gerekecek
-
-# Vector Database
-chromadb==0.4.24
 
 # Image Processing
 opencv-python-headless==4.9.0.80
