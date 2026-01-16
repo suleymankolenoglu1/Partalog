@@ -140,8 +140,67 @@ class Settings(BaseSettings):
 4. **Backend İşlemleri:**
    - Response'u parse eder
    - Hotspot entity'lere dönüştürür
+   - **OCR ile okunan label'ı Product RefNo ile eşleştirir**
+   - Eşleşme bulunursa `Hotspot.ProductId` set edilir
    - Veritabanına kaydeder
-   - Frontend'e sonucu döner
+   - Frontend'e sonucu döner (eşleştirme sayısı dahil)
+
+## Otomatik Ürün Eşleştirme
+
+Backend, hotspot'lar tespit edildikten sonra OCR ile okunan numaraları otomatik olarak Product tablosu ile eşleştirir.
+
+### Eşleştirme Mantığı:
+
+```csharp
+foreach (var hotspot in detectedHotspots)
+{
+    if (!string.IsNullOrEmpty(hotspot.Label))
+    {
+        if (int.TryParse(hotspot.Label, out int refNo))
+        {
+            var product = await _context.Products
+                .FirstOrDefaultAsync(p => p.CatalogId == page.CatalogId 
+                                       && p.RefNo == refNo);
+            
+            if (product != null)
+            {
+                hotspot.ProductId = product.Id;
+            }
+        }
+    }
+}
+```
+
+### Eşleştirme Senaryoları:
+
+1. **Başarılı Eşleştirme:**
+   - Hotspot Label: `"12"`
+   - Product RefNo: `12`
+   - Sonuç: `Hotspot.ProductId` set edilir ✅
+   - Log: `✅ Hotspot label '12' → Product RefNo 12 (ProductId: ...)`
+
+2. **Ürün Bulunamadı:**
+   - Hotspot Label: `"99"`
+   - Product RefNo: Yok
+   - Sonuç: `Hotspot.ProductId = null`
+   - Log: `⚠️ Hotspot label '99' için eşleşen ürün bulunamadı (RefNo: 99)`
+
+3. **Label Sayı Değil:**
+   - Hotspot Label: `"A1"` veya `"12-B"`
+   - Sonuç: `Hotspot.ProductId = null`
+   - Log: `ℹ️ Hotspot label 'A1' sayıya çevrilemedi, eşleştirme yapılmadı`
+
+### Frontend Kullanımı:
+
+Hotspot'a tıklandığında:
+```javascript
+// Hotspot'un ProductId'si varsa
+if (hotspot.productId) {
+    // Product detaylarını göster
+    const product = await fetchProduct(hotspot.productId);
+    displayProductDetails(product);
+}
+```
 
 ## Geriye Uyumluluk
 
@@ -219,6 +278,57 @@ curl -X POST "http://localhost:8000/detect?min_confidence=0.5" \
   "processingTimeMs": 123.45,
   "detections": [...]
 }
+```
+
+### 3. Backend Entegrasyon Testi (Ürün Eşleştirme ile):
+
+**Ön Koşullar:**
+1. Veritabanında bir katalog oluşturun
+2. Kataloğa ürünler ekleyin (RefNo: 12, 25, 30, vb.)
+3. Kataloga PDF yükleyin (sayfalar oluşsun)
+
+**Test:**
+```bash
+curl -X POST "http://localhost:5000/api/hotspots/detect/{pageId}?minConfidence=0.5" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Beklenen Response:**
+```json
+{
+  "message": "5 hotspot tespit edildi ve kaydedildi (3 ürün ile eşleştirildi)",
+  "pageId": "...",
+  "detectedCount": 5,
+  "matchedCount": 3,
+  "hotspots": [
+    {
+      "id": "...",
+      "label": "12",
+      "productId": "...",  // ✅ Eşleşti!
+      "isAiDetected": true,
+      "aiConfidence": 0.95
+    },
+    {
+      "id": "...",
+      "label": "99",
+      "productId": null,  // ⚠️ Ürün bulunamadı
+      "isAiDetected": true,
+      "aiConfidence": 0.88
+    }
+  ]
+}
+```
+
+**Backend Log Çıktıları:**
+```
+🔍 Sayfa ... için YOLO ile hotspot tespiti başlıyor
+✅ 5 hotspot tespit edildi
+✅ Hotspot label '12' → Product RefNo 12 (ProductId: ...)
+✅ Hotspot label '25' → Product RefNo 25 (ProductId: ...)
+✅ Hotspot label '30' → Product RefNo 30 (ProductId: ...)
+⚠️ Hotspot label '99' için eşleşen ürün bulunamadı (RefNo: 99)
+ℹ️ Hotspot label 'A1' sayıya çevrilemedi, eşleştirme yapılmadı
+✅ 5 hotspot başarıyla kaydedildi, 3 ürün ile eşleştirildi
 ```
 
 ## Servisler Çalıştırma
