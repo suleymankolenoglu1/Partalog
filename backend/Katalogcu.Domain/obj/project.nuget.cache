@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "wWwUv28x6Uw=",
+  "dgSpecHash": "PLf0M1+3Oos=",
   "success": true,
-  "projectFilePath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj",
+  "projectFilePath": "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Domain/Katalogcu.Domain.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

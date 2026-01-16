@@ -102,7 +102,9 @@ async def root():
         "docs": "/docs",
         "test_page": "/static/test.html",
         "endpoints": {
-            "detect": "/api/detect - Hotspot tespit + OCR numara okuma",
+            "detect_backend": "/detect - Backend-compatible hotspot detection (camelCase response)",
+            "detect": "/api/detect - Hotspot tespit + OCR numara okuma (snake_case response)",
+            "health": "/health - Backend-compatible health check",
             "info": "/api/info - Servis bilgileri"
         }
     }
