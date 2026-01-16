@@ -71,17 +71,52 @@ namespace Katalogcu.API.Controllers
                     });
                 }
 
+                // OCR ile okunan label'ları Product RefNo ile eşleştir
+                int matchedCount = 0;
+                foreach (var hotspot in detectedHotspots)
+                {
+                    if (!string.IsNullOrEmpty(hotspot.Label))
+                    {
+                        // Label'ı sayıya çevirmeye çalış
+                        if (int.TryParse(hotspot.Label, out int refNo))
+                        {
+                            // Bu kataloğa ait, RefNo'su eşleşen ürünü bul
+                            var product = await _context.Products
+                                .FirstOrDefaultAsync(p => p.CatalogId == page.CatalogId && p.RefNo == refNo);
+                            
+                            if (product != null)
+                            {
+                                hotspot.ProductId = product.Id;
+                                matchedCount++;
+                                _logger.LogInformation("✅ Hotspot label '{Label}' → Product RefNo {RefNo} (ProductId: {ProductId})", 
+                                    hotspot.Label, refNo, product.Id);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("⚠️ Hotspot label '{Label}' için eşleşen ürün bulunamadı (RefNo: {RefNo})", 
+                                    hotspot.Label, refNo);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogDebug("ℹ️ Hotspot label '{Label}' sayıya çevrilemedi, eşleştirme yapılmadı", hotspot.Label);
+                        }
+                    }
+                }
+
                 // Veritabanına kaydet
                 _context.Hotspots.AddRange(detectedHotspots);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("✅ {Count} hotspot başarıyla kaydedildi", detectedHotspots.Count);
+                _logger.LogInformation("✅ {Count} hotspot başarıyla kaydedildi, {MatchedCount} ürün ile eşleştirildi", 
+                    detectedHotspots.Count, matchedCount);
 
                 return Ok(new
                 {
-                    message = $"{detectedHotspots.Count} hotspot tespit edildi ve kaydedildi",
+                    message = $"{detectedHotspots.Count} hotspot tespit edildi ve kaydedildi ({matchedCount} ürün ile eşleştirildi)",
                     pageId = pageId,
                     detectedCount = detectedHotspots.Count,
+                    matchedCount = matchedCount,
                     hotspots = detectedHotspots
                 });
             }

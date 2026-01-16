@@ -378,7 +378,6 @@
 /home/runner/work/Partalog/Partalog/backend/Katalogcu.API/obj/Debug/net9.0/refint/Katalogcu.API.dll
 /home/runner/work/Partalog/Partalog/backend/Katalogcu.API/obj/Debug/net9.0/Katalogcu.API.pdb
 /home/runner/work/Partalog/Partalog/backend/Katalogcu.API/bin/Debug/net9.0/NOTICE.TXT
-/home/runner/work/Partalog/Partalog/backend/Katalogcu.API/bin/Debug/net9.0/appsettings.Development.json
 /home/runner/work/Partalog/Partalog/backend/Katalogcu.API/bin/Debug/net9.0/appsettings.example.json
 /home/runner/work/Partalog/Partalog/backend/Katalogcu.API/bin/Debug/net9.0/Katalogcu.API.staticwebassets.runtime.json
 /home/runner/work/Partalog/Partalog/backend/Katalogcu.API/bin/Debug/net9.0/Katalogcu.API.staticwebassets.endpoints.json
