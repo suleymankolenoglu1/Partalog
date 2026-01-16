@@ -1,5 +1,6 @@
 """
-Partalog AI Service - Ana Uygulama
+Partalog AI Service - Ana Uygulama (Basitleştirilmiş)
+Sadece YOLO Hotspot Tespiti + OCR Numara Okuma
 """
 
 from fastapi import FastAPI
@@ -22,106 +23,42 @@ logger.add(
 )
 
 
-# Model ve Servis referansları
+# Model referansları
 models = {}
-services = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
-    logger.info(f"🚀 {settings.APP_NAME} v{settings. APP_VERSION} başlatılıyor...")
+    logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} başlatılıyor...")
     logger.info("=" * 60)
     
-    # YOLO
+    # YOLO Detector
     try:
         from core.detector import HotspotDetector
         models["yolo"] = HotspotDetector(
-            model_path=settings.YOLO_MODEL_PATH,
-            confidence=settings.YOLO_CONFIDENCE,
+            model_path=settings. YOLO_MODEL_PATH,
+            confidence=settings. YOLO_CONFIDENCE,
             img_size=settings. YOLO_IMG_SIZE
         )
         logger.success("✅ YOLO Detector yüklendi")
-        from api.catalog import set_detector
-        set_detector(models["yolo"])
     except Exception as e:
         logger.error(f"❌ YOLO:  {e}")
+        models["yolo"] = None
     
-    # OCR
+    # OCR Reader
     try: 
-        from core. ocr import OCRReader
-        models["ocr"] = OCRReader(langs=settings.OCR_LANGS, use_gpu=settings. OCR_USE_GPU)
+        from core.ocr import HotspotOCR
+        models["ocr"] = HotspotOCR(use_gpu=settings.OCR_USE_GPU)
         logger.success("✅ OCR Reader yüklendi")
-        from api. catalog import set_ocr
-        set_ocr(models["ocr"])
     except Exception as e:
         logger.error(f"❌ OCR: {e}")
-    
-    # CLIP
-    try: 
-        from core.embedder import ImageEmbedder
-        models["clip"] = ImageEmbedder(model_name=settings.CLIP_MODEL_NAME, pretrained=settings. CLIP_PRETRAINED)
-        logger.success("✅ CLIP Embedder yüklendi")
-    except Exception as e: 
-        logger.error(f"❌ CLIP: {e}")
-    
-    # Segmenter
-    try: 
-        from core. segmenter import PartSegmenter
-        models["segmenter"] = PartSegmenter(
-            model_path=settings.SAM_MODEL_PATH,
-            model_type=settings.SAM_MODEL_TYPE,
-            use_sam=settings.SAM_ENABLED,
-            min_area=settings. SAM_MIN_AREA
-        )
-        logger.success(f"✅ Part Segmenter yüklendi ({models['segmenter']. backend})")
-    except Exception as e: 
-        logger.error(f"❌ Segmenter: {e}")
-    
-    # Vector Store
-    try: 
-        from core.vector_store import VectorStore
-        models["vector_store"] = VectorStore(
-            persist_directory=str(settings.VECTOR_DB_DIR),
-            collection_name=settings. VECTOR_DB_COLLECTION
-        )
-        logger.success("✅ Vector Store yüklendi")
-    except Exception as e:
-        logger.error(f"❌ Vector Store: {e}")
-    
-    # CatalogProcessor
-    try: 
-        from services.catalog_processor import CatalogProcessor
-        services["processor"] = CatalogProcessor(
-            detector=models. get("yolo"),
-            ocr_reader=models.get("ocr"),
-            segmenter=models. get("segmenter"),
-            embedder=models.get("clip"),
-            vector_store=models.get("vector_store")
-        )
-        logger.success("✅ CatalogProcessor yüklendi")
-        from api.catalog import set_processor
-        set_processor(services["processor"])
-    except Exception as e: 
-        logger.error(f"❌ CatalogProcessor:  {e}")
-    
-    # VisualSearchService
-    try: 
-        from services.visual_search import VisualSearchService
-        services["search"] = VisualSearchService(
-            embedder=models.get("clip"),
-            vector_store=models.get("vector_store")
-        )
-        logger.success("✅ VisualSearchService yüklendi")
-        from api.search import set_search_service, set_vector_store
-        set_search_service(services["search"])
-        set_vector_store(models.get("vector_store"))
-    except Exception as e: 
-        logger.error(f"❌ VisualSearchService: {e}")
+        models["ocr"] = None
     
     logger.info("=" * 60)
     logger.info("🎯 Servis hazır!")
-    logger.info("📍 Test sayfası: http://localhost:8000/static/test.html")
+    logger.info(f"📍 API Docs: http://localhost:{settings.PORT}/docs")
+    logger.info(f"📍 Test Page: http://localhost:{settings.PORT}/static/test.html")
     logger.info("=" * 60)
     
     yield
@@ -133,7 +70,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Yedek parça kataloğu için AI görsel işleme servisi",
+    description="Yedek parça kataloğu için AI görsel işleme servisi - YOLO + OCR",
     lifespan=lifespan
 )
 
@@ -149,12 +86,9 @@ app. add_middleware(
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Routers
-from api.catalog import router as catalog_router
-from api.search import router as search_router
-
-app.include_router(catalog_router, prefix="/catalog", tags=["Catalog"])
-app.include_router(search_router, prefix="/search", tags=["Search"])
+# API Router
+from api.hotspot import router as hotspot_router
+app.include_router(hotspot_router, prefix="/api", tags=["Hotspot Detection"])
 
 
 @app.get("/", tags=["Health"])
@@ -163,15 +97,25 @@ async def root():
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "docs": "/docs",
-        "test_page": "/static/test.html"
+        "test_page": "/static/test.html",
+        "endpoints": {
+            "detect": "/api/detect - Hotspot tespit + OCR numara okuma",
+            "info": "/api/info - Servis bilgileri"
+        }
     }
 
 
 @app. get("/health", tags=["Health"])
 async def health():
-    return {"status": "healthy", "models": {k: v is not None for k, v in models.items()}}
+    return {
+        "status": "healthy",
+        "models": {
+            "yolo": models.get("yolo") is not None,
+            "ocr":  models.get("ocr") is not None
+        }
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+    uvicorn. run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
