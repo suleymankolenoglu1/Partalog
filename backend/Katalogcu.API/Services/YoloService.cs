@@ -1,6 +1,7 @@
-using Katalogcu.Domain.Entities;
-using System.Net.Http.Headers;
+using Katalogcu.Domain. Entities;
+using System.Net. Http.Headers;
 using System.Text.Json;
+using System. Text.Json.Serialization;
 
 namespace Katalogcu.API.Services
 {
@@ -30,7 +31,6 @@ namespace Katalogcu.API.Services
         /// <returns>Tespit edilen hotspot listesi</returns>
         public async Task<List<Hotspot>> DetectHotspotsAsync(string imageUrl, Guid pageId, double minConfidence = 0.5)
         {
-            // Input validation
             if (string.IsNullOrWhiteSpace(imageUrl))
             {
                 throw new ArgumentException("Image URL cannot be null or empty", nameof(imageUrl));
@@ -49,7 +49,7 @@ namespace Katalogcu.API.Services
                 byte[] imageBytes = await DownloadImageAsync(imageUrl);
 
                 // YOLO API'ye gönder
-                var detectionResponse = await SendToYoloApiAsync(imageBytes, Path.GetFileName(imageUrl), minConfidence);
+                var detectionResponse = await SendToYoloApiAsync(imageBytes, Path. GetFileName(imageUrl), minConfidence);
 
                 if (!detectionResponse.Success)
                 {
@@ -64,8 +64,8 @@ namespace Katalogcu.API.Services
                     Left = d.Left,
                     Top = d.Top,
                     Width = d.Width,
-                    Height = d.Height,
-                    Label = d.Label, // YOLO numara okuyamaz, null olacak
+                    Height = d. Height,
+                    Label = d.Label,
                     IsAiDetected = true,
                     AiConfidence = d.Confidence,
                     CreatedDate = DateTime.UtcNow
@@ -88,18 +88,19 @@ namespace Katalogcu.API.Services
         {
             try
             {
-                var yoloUrl = _configuration["YoloService:BaseUrl"] ?? "http://localhost:8000";
+                var yoloUrl = _configuration["YoloService:BaseUrl"] ??  "http://localhost:8000";
                 var response = await _httpClient.GetAsync($"{yoloUrl}/health");
                 
                 if (response.IsSuccessStatusCode)
                 {
                     var content = await response.Content.ReadAsStringAsync();
-                    var health = JsonSerializer.Deserialize<YoloHealthResponse>(content, new JsonSerializerOptions 
+                    var health = JsonSerializer. Deserialize<YoloHealthResponse>(content, new JsonSerializerOptions 
                     { 
                         PropertyNameCaseInsensitive = true 
                     });
                     
-                    return health?.ModelLoaded ?? false;
+                    // ✅ Güncellendi:  models. yolo kontrolü
+                    return health?.Models?.Yolo ?? false;
                 }
                 
                 return false;
@@ -111,18 +112,44 @@ namespace Katalogcu.API.Services
             }
         }
 
+        /// <summary>
+        /// YOLO servisi hakkında detaylı bilgi alır
+        /// </summary>
+        public async Task<YoloServiceInfo? > GetServiceInfoAsync()
+        {
+            try
+            {
+                var yoloUrl = _configuration["YoloService:BaseUrl"] ?? "http://localhost:8000";
+                var response = await _httpClient.GetAsync($"{yoloUrl}/api/info");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    return JsonSerializer.Deserialize<YoloServiceInfo>(content, new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true 
+                    });
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger. LogWarning(ex, "YOLO servis bilgisi alınamadı");
+                return null;
+            }
+        }
+
         #region Private Methods
 
         private async Task<byte[]> DownloadImageAsync(string imageUrl)
         {
             try
             {
-                // URL'yi tam path'e çevir
                 string fullUrl = imageUrl;
                 if (!imageUrl.StartsWith("http"))
                 {
-                    // Göreceli URL ise, tam path oluştur
-                    var baseUrl = _configuration["YoloService:ImageBaseUrl"] ?? "http://localhost:5000";
+                    var baseUrl = _configuration["YoloService:ImageBaseUrl"] ??  "http://localhost:5159";
                     fullUrl = $"{baseUrl}/{imageUrl.TrimStart('/')}";
                 }
 
@@ -142,16 +169,16 @@ namespace Katalogcu.API.Services
 
         private async Task<YoloDetectionResponse> SendToYoloApiAsync(byte[] imageBytes, string fileName, double minConfidence)
         {
-            var yoloUrl = _configuration["YoloService:BaseUrl"] ?? "http://localhost:8000";
+            var yoloUrl = _configuration["YoloService: BaseUrl"] ?? "http://localhost:8000";
             
             using var content = new MultipartFormDataContent();
             var fileContent = new ByteArrayContent(imageBytes);
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/jpeg");
             content.Add(fileContent, "file", fileName);
 
-            _logger.LogInformation("📤 YOLO API'ye gönderiliyor: {Url}/detect", yoloUrl);
+            _logger.LogInformation("📤 YOLO API'ye gönderiliyor: {Url}/api/detect", yoloUrl);
             
-            var response = await _httpClient.PostAsync($"{yoloUrl}/detect?min_confidence={minConfidence}", content);
+            var response = await _httpClient.PostAsync($"{yoloUrl}/api/detect?min_confidence={minConfidence}", content);
             
             if (!response.IsSuccessStatusCode)
             {
@@ -166,7 +193,7 @@ namespace Katalogcu.API.Services
                 PropertyNameCaseInsensitive = true 
             });
 
-            return result ?? new YoloDetectionResponse { Success = false, Error = "Yanıt parse edilemedi" };
+            return result ??  new YoloDetectionResponse { Success = false, Error = "Yanıt parse edilemedi" };
         }
 
         #endregion
@@ -199,8 +226,22 @@ namespace Katalogcu.API.Services
         private class YoloHealthResponse
         {
             public string Status { get; set; } = string.Empty;
-            public bool ModelLoaded { get; set; }
-            public string ModelPath { get; set; } = string.Empty;
+            public YoloModelsStatus?  Models { get; set; }
+        }
+
+        private class YoloModelsStatus
+        {
+            public bool Yolo { get; set; }
+            public bool Ocr { get; set; }
+            
+            [JsonPropertyName("table_reader")]
+            public bool TableReader { get; set; }
+        }
+
+        public class YoloServiceInfo
+        {
+            public string Service { get; set; } = string.Empty;
+            public Dictionary<string, object>? Models { get; set; }
         }
 
         #endregion

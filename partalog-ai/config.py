@@ -1,5 +1,5 @@
 """
-Partalog AI Service - Configuration (Basitleştirilmiş)
+Partalog AI Service - Configuration (Güncellenmiş)
 """
 
 from pydantic_settings import BaseSettings
@@ -9,8 +9,8 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     # GENEL
-    APP_NAME:  str = "Partalog AI Service"
-    APP_VERSION: str = "2.0.0"
+    APP_NAME: str = "Partalog AI Service"
+    APP_VERSION: str = "2.1.0"
     DEBUG: bool = Field(default=True)
     
     # SUNUCU
@@ -22,12 +22,18 @@ class Settings(BaseSettings):
     MODELS_DIR: Path = Field(default=Path("models"))
     
     # YOLO
-    YOLO_MODEL_PATH: str = Field(default="models/best. pt")
+    YOLO_MODEL_PATH: str = Field(default="models/best.pt")
     YOLO_CONFIDENCE: float = Field(default=0.25)
     YOLO_IMG_SIZE: int = Field(default=1280)
     
-    # OCR
+    # OCR (EasyOCR - Hotspot için)
     OCR_USE_GPU: bool = Field(default=False)
+    
+    # PADDLEOCR (Tablo okuma için)
+    PADDLE_USE_GPU: bool = Field(default=False)
+    PADDLE_LANG: str = Field(default="en")
+    PADDLE_TABLE_MAX_LEN: int = Field(default=800)
+    PADDLE_SHOW_LOG: bool = Field(default=False)
     
     class Config:
         env_file = ".env"

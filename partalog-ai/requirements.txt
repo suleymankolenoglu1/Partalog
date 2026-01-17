@@ -1,5 +1,5 @@
 # ============================================
-# PARTALOG AI SERVICE - Dependencies (Basitleştirilmiş)
+# PARTALOG AI SERVICE - Dependencies (Güncellenmiş)
 # ============================================
 
 # Web Framework
@@ -12,8 +12,18 @@ ultralytics==8.1.24
 torch==2.2.0
 torchvision==0.17.0
 
-# OCR
+# OCR - EasyOCR (Hotspot numara okuma)
 easyocr==1.7.1
+
+# OCR - PaddleOCR (Tablo okuma)
+paddlepaddle==2.6.2
+paddleocr==2.9.1
+
+# PDF Processing
+PyMuPDF==1.24.0
+
+# HTML Parsing
+beautifulsoup4==4.12.3
 
 # Image Processing
 opencv-python-headless==4.9.0.80

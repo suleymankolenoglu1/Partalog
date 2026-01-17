@@ -13,11 +13,17 @@ var builder = WebApplication.CreateBuilder(args);
 // --------------------------------------------------------
 builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<ExcelService>();
-builder.Services.AddScoped<CloudOcrService>();
+
 
 // YOLO servisi için HttpClient ve servis kaydı
 builder.Services.AddHttpClient<YoloService>();
 builder.Services.AddScoped<YoloService>();
+
+builder.Services.AddHttpClient<PaddleTableService>(client =>
+{
+    client. Timeout = TimeSpan.FromMinutes(2); // Tablo okuma uzun sürebilir
+});
+builder.Services.AddScoped<PaddleTableService>();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
