@@ -23,6 +23,36 @@ namespace Katalogcu.API.Controllers
             _yoloService = yoloService;
             _logger = logger;
         }
+        [AllowAnonymous]
+        [HttpGet("yolo-status")]
+public async Task<IActionResult> GetYoloStatus()
+{
+    try
+    {
+        var isHealthy = await _yoloService.IsHealthyAsync();
+        
+        return Ok(new
+        {
+            healthy = isHealthy,
+            service = "YOLO + EasyOCR",
+            url = "http://localhost:8000",
+            endpoints = new
+            {
+                detect = "POST /api/hotspots/detect/{pageId}",
+                health = "GET /api/hotspots/yolo-status"
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        return Ok(new
+        {
+            healthy = false,
+            service = "YOLO + EasyOCR",
+            error = ex.Message
+        });
+    }
+}
 
         // 1. Otomatik Hotspot Tespiti (YOLO ile)
         [HttpPost("detect/{pageId}")]

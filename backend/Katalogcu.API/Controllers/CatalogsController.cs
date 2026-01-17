@@ -1,12 +1,12 @@
-using Katalogcu.API. Services;
-using Katalogcu.Domain. Entities;
-using Katalogcu. Infrastructure. Persistence;
-using Microsoft. AspNetCore.Authorization;
-using Microsoft. AspNetCore. Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
+using Katalogcu.API.Services;
+using Katalogcu. Domain.Entities;
+using Katalogcu.Infrastructure. Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft. EntityFrameworkCore;
+using System. Text.Json;
 
-namespace Katalogcu. API.Controllers
+namespace Katalogcu.API.Controllers
 {
     [Authorize]
     [Route("api/[controller]")]
@@ -15,23 +15,29 @@ namespace Katalogcu. API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly PdfService _pdfService;
-        private readonly CloudOcrService _cloudService;
+        private readonly PaddleTableService _paddleService;
+        private readonly ILogger<CatalogsController> _logger;
 
-        public CatalogsController(AppDbContext context, PdfService pdfService, CloudOcrService cloudService)
+        public CatalogsController(
+            AppDbContext context, 
+            PdfService pdfService, 
+            PaddleTableService paddleService,
+            ILogger<CatalogsController> logger)
         {
             _context = context;
             _pdfService = pdfService;
-            _cloudService = cloudService;
+            _paddleService = paddleService;
+            _logger = logger;
         }
 
         // 1. Tüm Katalogları Listele
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var catalogs = await _context.Catalogs
+            var catalogs = await _context. Catalogs
                                          .Include(c => c.Pages)
                                          .OrderByDescending(c => c.CreatedDate)
-                                         .ToListAsync();
+                                         . ToListAsync();
             return Ok(catalogs);
         }
 
@@ -41,14 +47,14 @@ namespace Katalogcu. API.Controllers
         public async Task<IActionResult> GetById(Guid id)
         {
             var catalog = await _context.Catalogs
-                                        .Include(c => c.Pages. OrderBy(p => p. PageNumber))
+                                        .Include(c => c.Pages. OrderBy(p => p.PageNumber))
                                         .ThenInclude(p => p. Hotspots)
-                                        .Include(c => c. Products
+                                        .Include(c => c.Products
                                             .OrderBy(pr => pr.PageNumber)
-                                            .ThenBy(pr => pr. RefNo)
-                                            . ThenBy(pr => pr.CreatedDate)
+                                            .ThenBy(pr => pr.RefNo)
+                                            .ThenBy(pr => pr.CreatedDate)
                                         )
-                                        .FirstOrDefaultAsync(c => c. Id == id);
+                                        .FirstOrDefaultAsync(c => c.Id == id);
 
             if (catalog == null) return NotFound("Katalog bulunamadı.");
             return Ok(catalog);
@@ -59,17 +65,17 @@ namespace Katalogcu. API.Controllers
         public async Task<IActionResult> Create(Catalog catalog)
         {
             catalog.CreatedDate = DateTime. UtcNow;
-            catalog. Status = "Processing";
+            catalog.Status = "Processing";
 
-            _context. Catalogs.Add(catalog);
-            await _context.SaveChangesAsync();
+            _context.Catalogs.Add(catalog);
+            await _context. SaveChangesAsync();
 
             if (! string.IsNullOrEmpty(catalog.PdfUrl))
             {
                 try
                 {
-                    var fileName = Path.GetFileName(catalog.PdfUrl);
-                    var pageUrls = await _pdfService.ConvertPdfToImages(fileName);
+                    var fileName = Path.GetFileName(catalog. PdfUrl);
+                    var pageUrls = await _pdfService. ConvertPdfToImages(fileName);
 
                     int pageNum = 1;
                     var newPages = new List<CatalogPage>();
@@ -92,8 +98,8 @@ namespace Katalogcu. API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Hata: {ex. Message}");
-                    catalog.Status = "Error";
+                    _logger.LogError(ex, "PDF işleme hatası");
+                    catalog. Status = "Error";
                     await _context.SaveChangesAsync();
                 }
             }
@@ -101,28 +107,47 @@ namespace Katalogcu. API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = catalog.Id }, catalog);
         }
 
-        // 4. AI Analizi (Eski - Geriye Dönük Uyumluluk)
+        // 4. AI Analizi - PaddleOCR ile
         [HttpPost("{id}/analyze")]
         public async Task<IActionResult> Analyze(Guid id, [FromBody] AnalyzeRequest request)
         {
-            var catalog = await _context.Catalogs.FirstOrDefaultAsync(c => c.Id == id);
-            if (catalog == null) return NotFound("Katalog bulunamadı.");
-            if (string.IsNullOrEmpty(catalog.PdfUrl)) return BadRequest("Kataloğun PDF dosyası yok.");
+            var catalog = await _context.Catalogs
+                . Include(c => c.Pages)
+                .FirstOrDefaultAsync(c => c. Id == id);
+                
+            if (catalog == null) 
+                return NotFound("Katalog bulunamadı.");
+            if (string.IsNullOrEmpty(catalog.PdfUrl)) 
+                return BadRequest("Kataloğun PDF dosyası yok.");
 
             var page = await _context.CatalogPages.FindAsync(Guid.Parse(request.PageId));
-            if (page == null) return NotFound("Sayfa bulunamadı");
+            if (page == null) 
+                return NotFound("Sayfa bulunamadı");
+
+            // Servis sağlık kontrolü
+            var isHealthy = await _paddleService.IsHealthyAsync();
+            if (!isHealthy)
+            {
+                return StatusCode(503, new
+                {
+                    error = "PaddleOCR servisi kullanılamıyor",
+                    message = "Python servisi çalışıyor mu kontrol edin:  http://localhost:8000/health"
+                });
+            }
 
             try
             {
                 var defaultRect = new RectObj { X = 0, Y = 0, W = 100, H = 100 };
-                var tableRect = request. TableRect ?? defaultRect;
+                var tableRect = request.TableRect ?? defaultRect;
                 var imageRect = request.ImageRect ?? defaultRect;
 
                 string pdfFileName = Path.GetFileName(catalog.PdfUrl);
 
-                // Eski metod - Tablo ve resim aynı sayfada
-                var result = await _cloudService.AnalyzeCatalogPage(
+                _logger.LogInformation("🐼 PaddleOCR Analizi Başlıyor - Sayfa {PageNumber}", page.PageNumber);
+
+                var result = await _paddleService.AnalyzeCatalogPageAsync(
                     pdfFileName,
+                    page.PageNumber,
                     page.PageNumber,
                     page.ImageUrl,
                     id,
@@ -131,7 +156,7 @@ namespace Katalogcu. API.Controllers
                     imageRect
                 );
 
-                LogAnalysisResult(result. products);
+                LogAnalysisResult(result.products);
 
                 if (result.products.Any())
                 {
@@ -140,37 +165,49 @@ namespace Katalogcu. API.Controllers
 
                 if (result.hotspots. Any())
                 {
-                    _context.Hotspots.AddRange(result.hotspots);
+                    _context.Hotspots. AddRange(result.hotspots);
                 }
 
                 await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
-                    message = "AI Analizi Başarılı!",
+                    message = "AI Analizi Başarılı! ",
+                    engine = "PaddleOCR",
                     productCount = result.products.Count,
-                    hotspotCount = result.hotspots. Count
+                    hotspotCount = result.hotspots.Count
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"AI Hatası: {ex. Message}");
+                _logger.LogError(ex, "PaddleOCR Analiz Hatası");
+                return StatusCode(500, $"AI Hatası: {ex.Message}");
             }
         }
 
-        // 5. AI Analizi (Yeni - Çoklu Sayfa Desteği)
+        // 5. AI Analizi (Çoklu Sayfa Desteği) - PaddleOCR ile
         [HttpPost("{id}/analyze-multi")]
         public async Task<IActionResult> AnalyzeMultiPage(Guid id, [FromBody] MultiPageAnalyzeRequest request)
         {
-            // Katalog kontrolü
             var catalog = await _context. Catalogs
-                . Include(c => c.Pages)
+                .Include(c => c.Pages)
                 .FirstOrDefaultAsync(c => c.Id == id);
                 
             if (catalog == null) 
                 return NotFound("Katalog bulunamadı.");
             if (string.IsNullOrEmpty(catalog.PdfUrl)) 
                 return BadRequest("Kataloğun PDF dosyası yok.");
+
+            // Servis sağlık kontrolü
+            var isHealthy = await _paddleService.IsHealthyAsync();
+            if (!isHealthy)
+            {
+                return StatusCode(503, new
+                {
+                    error = "PaddleOCR servisi kullanılamıyor",
+                    message = "Python servisi çalışıyor mu kontrol edin: http://localhost:8000/health"
+                });
+            }
 
             // Tablo sayfası kontrolü
             if (! Guid.TryParse(request.TablePageId, out Guid tablePageGuid))
@@ -192,39 +229,32 @@ namespace Katalogcu. API.Controllers
             {
                 var defaultRect = new RectObj { X = 0, Y = 0, W = 100, H = 100 };
                 var tableRect = request.TableRect ?? defaultRect;
-                var imageRect = request.ImageRect ??  defaultRect;
+                var imageRect = request.ImageRect ?? defaultRect;
 
-                string pdfFileName = Path.GetFileName(catalog.PdfUrl);
+                string pdfFileName = Path. GetFileName(catalog.PdfUrl);
 
-                Console.WriteLine("\n" + new string('=', 80));
-                Console.ForegroundColor = ConsoleColor. Cyan;
-                Console.WriteLine("🚀 MULTI-PAGE ANALİZ BAŞLADI");
-                Console.ResetColor();
-                Console.WriteLine($"   📋 Tablo Sayfası: {tablePage. PageNumber} (ID: {tablePage. Id})");
-                Console. WriteLine($"   🎨 Teknik Resim Sayfası: {imagePage.PageNumber} (ID: {imagePage.Id})");
-                Console.WriteLine(new string('=', 80));
+                _logger.LogInformation("🐼 PaddleOCR Multi-Page Analizi Başlıyor");
+                _logger.LogInformation("   📋 Tablo Sayfası: {TablePage}", tablePage.PageNumber);
+                _logger.LogInformation("   🎨 Teknik Resim Sayfası: {ImagePage}", imagePage. PageNumber);
 
-                // Yeni metod - Tablo ve resim farklı sayfalarda olabilir
-                var result = await _cloudService.AnalyzeCatalogPage(
+                var result = await _paddleService.AnalyzeCatalogPageAsync(
                     pdfFileName,
-                    tablePage.PageNumber,      // Tablo sayfası numarası
-                    imagePage.PageNumber,      // Teknik resim sayfası numarası
-                    imagePage.ImageUrl,        // Teknik resim görüntüsü
-                    id,                        // Katalog ID
-                    imagePage.Id,              // Hotspot'lar teknik resim sayfasına bağlanacak
+                    tablePage.PageNumber,
+                    imagePage.PageNumber,
+                    imagePage.ImageUrl,
+                    id,
+                    imagePage.Id,
                     tableRect,
                     imageRect
                 );
 
                 LogAnalysisResult(result.products);
 
-                // Ürünleri kaydet
-                if (result.products. Any())
+                if (result.products.Any())
                 {
-                    _context.Products.AddRange(result.products);
+                    _context.Products.AddRange(result. products);
                 }
 
-                // Hotspot'ları kaydet
                 if (result.hotspots.Any())
                 {
                     _context.Hotspots.AddRange(result.hotspots);
@@ -235,17 +265,16 @@ namespace Katalogcu. API.Controllers
                 return Ok(new
                 {
                     message = "Çoklu Sayfa AI Analizi Başarılı!",
+                    engine = "PaddleOCR",
                     tablePageNumber = tablePage.PageNumber,
                     imagePageNumber = imagePage.PageNumber,
-                    productCount = result.products. Count,
+                    productCount = result.products.Count,
                     hotspotCount = result.hotspots.Count
                 });
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Multi-Page Analiz Hatası: {ex. Message}");
-                Console.ResetColor();
+                _logger.LogError(ex, "PaddleOCR Multi-Page Analiz Hatası");
                 return StatusCode(500, $"AI Hatası: {ex.Message}");
             }
         }
@@ -254,11 +283,11 @@ namespace Katalogcu. API.Controllers
         [HttpPost("{id}/publish")]
         public async Task<IActionResult> Publish(Guid id)
         {
-            var catalog = await _context.Catalogs.FindAsync(id);
+            var catalog = await _context.Catalogs. FindAsync(id);
             if (catalog == null) return NotFound();
 
             catalog.Status = "Published";
-            catalog.UpdatedDate = DateTime. UtcNow;
+            catalog.UpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
@@ -269,7 +298,7 @@ namespace Katalogcu. API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var catalog = await _context.Catalogs. FindAsync(id);
+            var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound("Katalog bulunamadı.");
 
             var pageIds = await _context.CatalogPages
@@ -277,8 +306,8 @@ namespace Katalogcu. API.Controllers
                 .Select(p => p.Id)
                 .ToListAsync();
                 
-            var productIds = await _context. Products
-                .Where(p => p. CatalogId == id)
+            var productIds = await _context.Products
+                .Where(p => p.CatalogId == id)
                 .Select(p => p.Id)
                 .ToListAsync();
 
@@ -286,17 +315,17 @@ namespace Katalogcu. API.Controllers
             {
                 await _context. Hotspots
                     .Where(h => pageIds.Contains(h.PageId) || 
-                           (h.ProductId != null && productIds.Contains(h.ProductId.Value)))
+                           (h.ProductId != null && productIds.Contains(h.ProductId. Value)))
                     .ExecuteDeleteAsync();
             }
 
             if (pageIds.Any())
-                await _context.CatalogPages.Where(p => pageIds.Contains(p.Id)).ExecuteDeleteAsync();
+                await _context.CatalogPages. Where(p => pageIds.Contains(p.Id)).ExecuteDeleteAsync();
                 
             if (productIds.Any())
-                await _context. Products.Where(p => productIds.Contains(p.Id)).ExecuteDeleteAsync();
+                await _context.Products.Where(p => productIds.Contains(p.Id)).ExecuteDeleteAsync();
 
-            _context. Catalogs.Remove(catalog);
+            _context.Catalogs.Remove(catalog);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -309,16 +338,14 @@ namespace Katalogcu. API.Controllers
             var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound("Katalog bulunamadı.");
 
-            var page = await _context. CatalogPages. FindAsync(pageId);
+            var page = await _context.CatalogPages.FindAsync(pageId);
             if (page == null) return NotFound("Sayfa bulunamadı.");
 
-            // Bu sayfadaki hotspot'ları sil
             var deletedHotspots = await _context. Hotspots
                 .Where(h => h.PageId == pageId)
                 .ExecuteDeleteAsync();
 
-            // Bu sayfaya ait ürünleri sil (PageNumber'a göre)
-            var deletedProducts = await _context.Products
+            var deletedProducts = await _context. Products
                 .Where(p => p.CatalogId == id && p.PageNumber == page.PageNumber. ToString())
                 .ExecuteDeleteAsync();
 
@@ -330,6 +357,35 @@ namespace Katalogcu. API.Controllers
             });
         }
 
+        // 9. PaddleOCR Servis Durumu
+        [AllowAnonymous]
+        [HttpGet("ai-status")]
+        public async Task<IActionResult> GetAiStatus()
+        {
+            try
+            {
+                var isHealthy = await _paddleService.IsHealthyAsync();
+                var info = await _paddleService.GetServiceInfoAsync();
+
+                return Ok(new
+                {
+                    healthy = isHealthy,
+                    service = "PaddleOCR",
+                    url = "http://localhost:8000",
+                    info = info
+                });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new
+                {
+                    healthy = false,
+                    service = "PaddleOCR",
+                    error = ex.Message
+                });
+            }
+        }
+
         #region Private Methods
 
         private void LogAnalysisResult(List<Product> products)
@@ -337,17 +393,16 @@ namespace Katalogcu. API.Controllers
             var logData = products.Select(p => new
             {
                 page_number = p.PageNumber,
-                ref_no = p. RefNo,
+                ref_no = p.RefNo,
                 part_code = p.Code,
                 part_name = p.Name,
                 quantity = p.StockQuantity
             }).ToList();
 
-            var jsonLog = JsonSerializer. Serialize(logData, new JsonSerializerOptions { WriteIndented = true });
+            var jsonLog = JsonSerializer.Serialize(logData, new JsonSerializerOptions { WriteIndented = true });
 
-            Console.WriteLine("\n=== ☁️ CLOUD OCR RAW DATA (Saved to DB) ===");
-            Console. WriteLine(jsonLog);
-            Console.WriteLine("==========================================\n");
+            _logger.LogInformation("=== 🐼 PaddleOCR DATA (Saved to DB) ===");
+            _logger.LogInformation(jsonLog);
         }
 
         #endregion
@@ -355,39 +410,18 @@ namespace Katalogcu. API.Controllers
 
     #region Request Models
 
-    /// <summary>
-    /// Eski analiz isteği - Tablo ve resim aynı sayfada
-    /// </summary>
     public class AnalyzeRequest
     {
         public required string PageId { get; set; }
-        public RectObj?  TableRect { get; set; }
-        public RectObj?  ImageRect { get; set; }
+        public RectObj? TableRect { get; set; }
+        public RectObj? ImageRect { get; set; }
     }
 
-    /// <summary>
-    /// Yeni analiz isteği - Tablo ve resim farklı sayfalarda olabilir
-    /// </summary>
     public class MultiPageAnalyzeRequest
     {
-        /// <summary>
-        /// Tablo sayfasının ID'si (parça listesi tablosunun bulunduğu sayfa)
-        /// </summary>
         public required string TablePageId { get; set; }
-
-        /// <summary>
-        /// Tablo alanı koordinatları (yüzde olarak)
-        /// </summary>
-        public RectObj?  TableRect { get; set; }
-
-        /// <summary>
-        /// Teknik resim sayfasının ID'si (numaralı parça resminin bulunduğu sayfa)
-        /// </summary>
+        public RectObj? TableRect { get; set; }
         public required string ImagePageId { get; set; }
-
-        /// <summary>
-        /// Teknik resim alanı koordinatları (yüzde olarak)
-        /// </summary>
         public RectObj? ImageRect { get; set; }
     }
 
