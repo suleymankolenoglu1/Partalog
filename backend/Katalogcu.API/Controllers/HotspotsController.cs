@@ -1,5 +1,4 @@
-
-
+using Katalogcu.API.Services;
 using Katalogcu.Domain.Entities;
 using Katalogcu.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -8,62 +7,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Katalogcu.API.Controllers
 {
-    [Authorize] // Sadece giriş yapanlar
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class HotspotsController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly Services.YoloService _yoloService;
+        private readonly IPartalogAiService _aiService; // ✅ YENİ AI SERVİSİ
         private readonly ILogger<HotspotsController> _logger;
+        private readonly IWebHostEnvironment _env; // 📂 Dosya yolu bulucu
 
-        public HotspotsController(AppDbContext context, Services.YoloService yoloService, ILogger<HotspotsController> logger)
+        public HotspotsController(
+            AppDbContext context, 
+            IPartalogAiService aiService, 
+            ILogger<HotspotsController> logger,
+            IWebHostEnvironment env)
         {
             _context = context;
-            _yoloService = yoloService;
+            _aiService = aiService;
             _logger = logger;
+            _env = env;
         }
-        [AllowAnonymous]
-        [HttpGet("yolo-status")]
-public async Task<IActionResult> GetYoloStatus()
-{
-    try
-    {
-        var isHealthy = await _yoloService.IsHealthyAsync();
-        
-        return Ok(new
-        {
-            healthy = isHealthy,
-            service = "YOLO + EasyOCR",
-            url = "http://localhost:8000",
-            endpoints = new
-            {
-                detect = "POST /api/hotspots/detect/{pageId}",
-                health = "GET /api/hotspots/yolo-status"
-            }
-        });
-    }
-    catch (Exception ex)
-    {
-        return Ok(new
-        {
-            healthy = false,
-            service = "YOLO + EasyOCR",
-            error = ex.Message
-        });
-    }
-}
 
         // 1. Otomatik Hotspot Tespiti (YOLO ile)
         [HttpPost("detect/{pageId}")]
-        public async Task<IActionResult> DetectHotspots(Guid pageId, [FromQuery] double minConfidence = 0.5)
+        public async Task<IActionResult> DetectHotspots(Guid pageId)
         {
-            // Input validation
-            if (minConfidence < 0.0 || minConfidence > 1.0)
-            {
-                return BadRequest(new { error = "minConfidence parametresi 0.0 ile 1.0 arasında olmalıdır" });
-            }
-
             try
             {
                 // Sayfayı bul
@@ -78,17 +47,25 @@ public async Task<IActionResult> GetYoloStatus()
                     return BadRequest(new { error = "Sayfanın görüntüsü yok" });
                 }
 
-                // YOLO servis sağlığını kontrol et
-                var isHealthy = await _yoloService.IsHealthyAsync();
-                if (!isHealthy)
+                // 1. Dosya yolunu bul
+                var filePath = GetPhysicalPath(page.ImageUrl);
+                if (!System.IO.File.Exists(filePath))
                 {
-                    return StatusCode(503, new { error = "YOLO servisi çalışmıyor veya model yüklenmemiş" });
+                    return BadRequest($"Görüntü dosyası sunucuda bulunamadı: {filePath}");
                 }
 
-                _logger.LogInformation("🔍 Sayfa {PageId} için YOLO ile hotspot tespiti başlıyor", pageId);
+                _logger.LogInformation("🔍 Sayfa {PageNumber} için YOLO ile hotspot tespiti başlıyor...", page.PageNumber);
 
-                // YOLO ile hotspot'ları tespit et
-                var detectedHotspots = await _yoloService.DetectHotspotsAsync(page.ImageUrl, pageId, minConfidence);
+                // 2. Dosyayı Stream Olarak Aç
+                using var stream = System.IO.File.OpenRead(filePath);
+                var formFile = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(filePath))
+                {
+                    Headers = new HeaderDictionary(),
+                    ContentType = "image/jpeg"
+                };
+
+                // 3. AI Servisine Gönder
+                var detectedHotspots = await _aiService.DetectHotspotsAsync(formFile, pageId);
 
                 if (!detectedHotspots.Any())
                 {
@@ -101,7 +78,8 @@ public async Task<IActionResult> GetYoloStatus()
                     });
                 }
 
-                // Veritabanına kaydet
+                // 4. Veritabanına kaydet
+                // (İsteğe bağlı: Önce eski otomatik tespit edilenleri silebilirsin)
                 _context.Hotspots.AddRange(detectedHotspots);
                 await _context.SaveChangesAsync();
 
@@ -115,11 +93,6 @@ public async Task<IActionResult> GetYoloStatus()
                     hotspots = detectedHotspots
                 });
             }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, "YOLO servisi ile iletişim hatası");
-                return StatusCode(503, new { error = "YOLO servisi ile iletişim kurulamadı", details = ex.Message });
-            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Hotspot tespit hatası");
@@ -127,21 +100,23 @@ public async Task<IActionResult> GetYoloStatus()
             }
         }
 
-        // 2. Yeni Hotspot Ekle (POST) - Manuel ekleme
+        // 2. Yeni Hotspot Ekle (Manuel)
         [HttpPost]
         public async Task<IActionResult> Create(Hotspot hotspot)
         {
-            // Hangi sayfa?
-            var page = await _context.CatalogPages
-                                     .Include(p => p.Hotspots)
-                                     .FirstOrDefaultAsync(p => p.Id == hotspot.PageId);
-            
+            // Sayfa kontrolü
+            var page = await _context.CatalogPages.FindAsync(hotspot.PageId);
             if (page == null) return NotFound("Sayfa bulunamadı.");
 
-            // Otomatik numara ver (Mevcutların en büyüğü + 1)
-            //int nextNumber = page.Hotspots.Any() ? page.Hotspots.Max(h => h.Number.ToString) + 1 : 1;
-            //hotspot.Number = nextNumber;
+            // Gerekli alanları doldur
+            hotspot.Id = Guid.NewGuid();
             hotspot.CreatedDate = DateTime.UtcNow;
+            
+            // Eğer Label boş geldiyse varsayılan bir değer ata
+            if (string.IsNullOrEmpty(hotspot.Label))
+            {
+                hotspot.Label = "?";
+            }
 
             _context.Hotspots.Add(hotspot);
             await _context.SaveChangesAsync();
@@ -149,7 +124,7 @@ public async Task<IActionResult> GetYoloStatus()
             return Ok(hotspot);
         }
 
-        // 3. Hotspot Sil (DELETE)
+        // 3. Hotspot Sil
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -159,6 +134,23 @@ public async Task<IActionResult> GetYoloStatus()
             _context.Hotspots.Remove(hotspot);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // --- YARDIMCI METODLAR ---
+
+        private string GetPhysicalPath(string url)
+        {
+            var fileName = Path.GetFileName(url);
+            
+            // 1. Önce "uploads/pages" klasörüne bak
+            var pathPages = Path.Combine(_env.WebRootPath, "uploads", "pages", fileName);
+            if (System.IO.File.Exists(pathPages)) return pathPages;
+
+            // 2. Yoksa "uploads" köküne bak
+            var pathRoot = Path.Combine(_env.WebRootPath, "uploads", fileName);
+            if (System.IO.File.Exists(pathRoot)) return pathRoot;
+
+            return pathPages;
         }
     }
 }

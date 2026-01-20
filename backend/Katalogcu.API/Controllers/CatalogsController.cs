@@ -1,10 +1,11 @@
 using Katalogcu.API.Services;
-using Katalogcu. Domain.Entities;
-using Katalogcu.Infrastructure. Persistence;
+using Katalogcu.Domain.Entities;
+using Katalogcu.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft. EntityFrameworkCore;
-using System. Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Katalogcu.API.Dtos; // DTO'ları buradan çekiyoruz
+using System.Text.Json;
 
 namespace Katalogcu.API.Controllers
 {
@@ -15,29 +16,32 @@ namespace Katalogcu.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly PdfService _pdfService;
-        private readonly PaddleTableService _paddleService;
+        private readonly IPartalogAiService _aiService; // ✅ YENİ AI SERVİSİ
         private readonly ILogger<CatalogsController> _logger;
+        private readonly IWebHostEnvironment _env; // 📂 Dosya yolu bulucu
 
         public CatalogsController(
-            AppDbContext context, 
-            PdfService pdfService, 
-            PaddleTableService paddleService,
-            ILogger<CatalogsController> logger)
+            AppDbContext context,
+            PdfService pdfService,
+            IPartalogAiService aiService,
+            ILogger<CatalogsController> logger,
+            IWebHostEnvironment env)
         {
             _context = context;
             _pdfService = pdfService;
-            _paddleService = paddleService;
+            _aiService = aiService;
             _logger = logger;
+            _env = env;
         }
 
         // 1. Tüm Katalogları Listele
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var catalogs = await _context. Catalogs
+            var catalogs = await _context.Catalogs
                                          .Include(c => c.Pages)
                                          .OrderByDescending(c => c.CreatedDate)
-                                         . ToListAsync();
+                                         .ToListAsync();
             return Ok(catalogs);
         }
 
@@ -47,8 +51,8 @@ namespace Katalogcu.API.Controllers
         public async Task<IActionResult> GetById(Guid id)
         {
             var catalog = await _context.Catalogs
-                                        .Include(c => c.Pages. OrderBy(p => p.PageNumber))
-                                        .ThenInclude(p => p. Hotspots)
+                                        .Include(c => c.Pages.OrderBy(p => p.PageNumber))
+                                        .ThenInclude(p => p.Hotspots)
                                         .Include(c => c.Products
                                             .OrderBy(pr => pr.PageNumber)
                                             .ThenBy(pr => pr.RefNo)
@@ -64,18 +68,18 @@ namespace Katalogcu.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(Catalog catalog)
         {
-            catalog.CreatedDate = DateTime. UtcNow;
+            catalog.CreatedDate = DateTime.UtcNow;
             catalog.Status = "Processing";
 
             _context.Catalogs.Add(catalog);
-            await _context. SaveChangesAsync();
+            await _context.SaveChangesAsync();
 
-            if (! string.IsNullOrEmpty(catalog.PdfUrl))
+            if (!string.IsNullOrEmpty(catalog.PdfUrl))
             {
                 try
                 {
-                    var fileName = Path.GetFileName(catalog. PdfUrl);
-                    var pageUrls = await _pdfService. ConvertPdfToImages(fileName);
+                    var fileName = Path.GetFileName(catalog.PdfUrl);
+                    var pageUrls = await _pdfService.ConvertPdfToImages(fileName);
 
                     int pageNum = 1;
                     var newPages = new List<CatalogPage>();
@@ -93,13 +97,13 @@ namespace Katalogcu.API.Controllers
                     _context.CatalogPages.AddRange(newPages);
 
                     catalog.Status = "Draft";
-                    _context. Catalogs.Update(catalog);
+                    _context.Catalogs.Update(catalog);
                     await _context.SaveChangesAsync();
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "PDF işleme hatası");
-                    catalog. Status = "Error";
+                    catalog.Status = "Error";
                     await _context.SaveChangesAsync();
                 }
             }
@@ -107,183 +111,148 @@ namespace Katalogcu.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = catalog.Id }, catalog);
         }
 
-        // 4. AI Analizi - PaddleOCR ile
+        // 4. AI Analizi - TEK SAYFA (Hem Tablo Hem Hotspot)
         [HttpPost("{id}/analyze")]
-        public async Task<IActionResult> Analyze(Guid id, [FromBody] AnalyzeRequest request)
+        public async Task<IActionResult> Analyze(Guid id, [FromBody] AnalyzePageRequestDto request)
         {
-            var catalog = await _context.Catalogs
-                . Include(c => c.Pages)
-                .FirstOrDefaultAsync(c => c. Id == id);
-                
-            if (catalog == null) 
-                return NotFound("Katalog bulunamadı.");
-            if (string.IsNullOrEmpty(catalog.PdfUrl)) 
-                return BadRequest("Kataloğun PDF dosyası yok.");
+            var catalog = await _context.Catalogs.FindAsync(id);
+            if (catalog == null) return NotFound("Katalog bulunamadı.");
 
-            var page = await _context.CatalogPages.FindAsync(Guid.Parse(request.PageId));
-            if (page == null) 
-                return NotFound("Sayfa bulunamadı");
-
-            // Servis sağlık kontrolü
-            var isHealthy = await _paddleService.IsHealthyAsync();
-            if (!isHealthy)
-            {
-                return StatusCode(503, new
-                {
-                    error = "PaddleOCR servisi kullanılamıyor",
-                    message = "Python servisi çalışıyor mu kontrol edin:  http://localhost:8000/health"
-                });
-            }
+            var page = await _context.CatalogPages.FirstOrDefaultAsync(p => p.Id == request.PageId);
+            if (page == null) return NotFound("Sayfa bulunamadı");
 
             try
             {
-                var defaultRect = new RectObj { X = 0, Y = 0, W = 100, H = 100 };
-                var tableRect = request.TableRect ?? defaultRect;
-                var imageRect = request.ImageRect ?? defaultRect;
+                var filePath = GetPhysicalPath(page.ImageUrl);
+                if (!System.IO.File.Exists(filePath))
+                    return BadRequest($"Resim dosyası sunucuda bulunamadı: {filePath}");
 
-                string pdfFileName = Path.GetFileName(catalog.PdfUrl);
-
-                _logger.LogInformation("🐼 PaddleOCR Analizi Başlıyor - Sayfa {PageNumber}", page.PageNumber);
-
-                var result = await _paddleService.AnalyzeCatalogPageAsync(
-                    pdfFileName,
-                    page.PageNumber,
-                    page.PageNumber,
-                    page.ImageUrl,
-                    id,
-                    page.Id,
-                    tableRect,
-                    imageRect
-                );
-
-                LogAnalysisResult(result.products);
-
-                if (result.products.Any())
+                // --- A. GEMINI İLE TABLO OKUMA ---
+                // Dosya stream'i açıyoruz
+                using var streamTable = System.IO.File.OpenRead(filePath);
+                var formFileTable = new FormFile(streamTable, 0, streamTable.Length, "file", Path.GetFileName(filePath))
                 {
-                    _context.Products.AddRange(result.products);
+                    Headers = new HeaderDictionary(),
+                    ContentType = "image/jpeg"
+                };
+
+                var products = await _aiService.ExtractTableAsync(formFileTable, page.PageNumber, id);
+
+                // --- B. YOLO İLE HOTSPOT TESPİTİ ---
+                // Stream kapandığı için yeni bir stream açıyoruz (veya Position=0 yapılabilir ama bu daha güvenli)
+                using var streamHotspot = System.IO.File.OpenRead(filePath);
+                var formFileHotspot = new FormFile(streamHotspot, 0, streamHotspot.Length, "file", Path.GetFileName(filePath))
+                {
+                    Headers = new HeaderDictionary(),
+                    ContentType = "image/jpeg"
+                };
+
+                var hotspots = await _aiService.DetectHotspotsAsync(formFileHotspot, page.Id);
+
+                // --- C. KAYDETME ---
+                if (products.Any())
+                {
+                    // Eski ürünleri sil (Opsiyonel: İstersen üstüne ekle)
+                    // _context.Products.RemoveRange(_context.Products.Where(p => p.CatalogId == id && p.PageNumber == page.PageNumber.ToString()));
+                    _context.Products.AddRange(products);
                 }
 
-                if (result.hotspots. Any())
+                if (hotspots.Any())
                 {
-                    _context.Hotspots. AddRange(result.hotspots);
+                    _context.Hotspots.AddRange(hotspots);
                 }
 
                 await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
-                    message = "AI Analizi Başarılı! ",
-                    engine = "PaddleOCR",
-                    productCount = result.products.Count,
-                    hotspotCount = result.hotspots.Count
+                    message = "AI Analizi Başarılı (Gemini + YOLO)",
+                    productCount = products.Count,
+                    hotspotCount = hotspots.Count
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "PaddleOCR Analiz Hatası");
+                _logger.LogError(ex, "AI Analiz Hatası");
                 return StatusCode(500, $"AI Hatası: {ex.Message}");
             }
         }
 
-        // 5. AI Analizi (Çoklu Sayfa Desteği) - PaddleOCR ile
+        // 5. AI Analizi - ÇOKLU SAYFA (Tablo Sayfası Ayrı, Resim Sayfası Ayrı)
         [HttpPost("{id}/analyze-multi")]
-        public async Task<IActionResult> AnalyzeMultiPage(Guid id, [FromBody] MultiPageAnalyzeRequest request)
+        public async Task<IActionResult> AnalyzeMultiPage(Guid id, [FromBody] AnalyzeMultiPageRequestDto request)
         {
-            var catalog = await _context. Catalogs
-                .Include(c => c.Pages)
-                .FirstOrDefaultAsync(c => c.Id == id);
-                
-            if (catalog == null) 
-                return NotFound("Katalog bulunamadı.");
-            if (string.IsNullOrEmpty(catalog.PdfUrl)) 
-                return BadRequest("Kataloğun PDF dosyası yok.");
+            var catalog = await _context.Catalogs.FindAsync(id);
+            if (catalog == null) return NotFound("Katalog bulunamadı.");
 
-            // Servis sağlık kontrolü
-            var isHealthy = await _paddleService.IsHealthyAsync();
-            if (!isHealthy)
+            // --- 1. TABLO SAYFASI İŞLEMLERİ (GEMINI) ---
+            var tablePage = await _context.CatalogPages.FindAsync(request.TablePageId);
+            int productCount = 0;
+
+            if (tablePage != null)
             {
-                return StatusCode(503, new
+                var tablePath = GetPhysicalPath(tablePage.ImageUrl);
+                if (System.IO.File.Exists(tablePath))
                 {
-                    error = "PaddleOCR servisi kullanılamıyor",
-                    message = "Python servisi çalışıyor mu kontrol edin: http://localhost:8000/health"
-                });
-            }
+                    using var stream = System.IO.File.OpenRead(tablePath);
+                    var formFile = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(tablePath))
+                    {
+                        Headers = new HeaderDictionary(),
+                        ContentType = "image/jpeg"
+                    };
 
-            // Tablo sayfası kontrolü
-            if (! Guid.TryParse(request.TablePageId, out Guid tablePageGuid))
-                return BadRequest("Geçersiz TablePageId formatı.");
-
-            var tablePage = catalog.Pages.FirstOrDefault(p => p.Id == tablePageGuid);
-            if (tablePage == null) 
-                return NotFound("Tablo sayfası bulunamadı.");
-
-            // Teknik resim sayfası kontrolü
-            if (!Guid.TryParse(request.ImagePageId, out Guid imagePageGuid))
-                return BadRequest("Geçersiz ImagePageId formatı.");
-
-            var imagePage = catalog.Pages.FirstOrDefault(p => p.Id == imagePageGuid);
-            if (imagePage == null) 
-                return NotFound("Teknik resim sayfası bulunamadı.");
-
-            try
-            {
-                var defaultRect = new RectObj { X = 0, Y = 0, W = 100, H = 100 };
-                var tableRect = request.TableRect ?? defaultRect;
-                var imageRect = request.ImageRect ?? defaultRect;
-
-                string pdfFileName = Path. GetFileName(catalog.PdfUrl);
-
-                _logger.LogInformation("🐼 PaddleOCR Multi-Page Analizi Başlıyor");
-                _logger.LogInformation("   📋 Tablo Sayfası: {TablePage}", tablePage.PageNumber);
-                _logger.LogInformation("   🎨 Teknik Resim Sayfası: {ImagePage}", imagePage. PageNumber);
-
-                var result = await _paddleService.AnalyzeCatalogPageAsync(
-                    pdfFileName,
-                    tablePage.PageNumber,
-                    imagePage.PageNumber,
-                    imagePage.ImageUrl,
-                    id,
-                    imagePage.Id,
-                    tableRect,
-                    imageRect
-                );
-
-                LogAnalysisResult(result.products);
-
-                if (result.products.Any())
-                {
-                    _context.Products.AddRange(result. products);
+                    var products = await _aiService.ExtractTableAsync(formFile, tablePage.PageNumber, id);
+                    if (products.Any())
+                    {
+                        _context.Products.AddRange(products);
+                        productCount = products.Count;
+                    }
                 }
-
-                if (result.hotspots.Any())
-                {
-                    _context.Hotspots.AddRange(result.hotspots);
-                }
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    message = "Çoklu Sayfa AI Analizi Başarılı!",
-                    engine = "PaddleOCR",
-                    tablePageNumber = tablePage.PageNumber,
-                    imagePageNumber = imagePage.PageNumber,
-                    productCount = result.products.Count,
-                    hotspotCount = result.hotspots.Count
-                });
             }
-            catch (Exception ex)
+
+            // --- 2. TEKNİK RESİM SAYFASI İŞLEMLERİ (YOLO) ---
+            var imagePage = await _context.CatalogPages.FindAsync(request.ImagePageId);
+            int hotspotCount = 0;
+
+            if (imagePage != null)
             {
-                _logger.LogError(ex, "PaddleOCR Multi-Page Analiz Hatası");
-                return StatusCode(500, $"AI Hatası: {ex.Message}");
+                var imagePath = GetPhysicalPath(imagePage.ImageUrl);
+                if (System.IO.File.Exists(imagePath))
+                {
+                    using var stream = System.IO.File.OpenRead(imagePath);
+                    var formFile = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(imagePath))
+                    {
+                        Headers = new HeaderDictionary(),
+                        ContentType = "image/jpeg"
+                    };
+
+                    var hotspots = await _aiService.DetectHotspotsAsync(formFile, imagePage.Id);
+                    if (hotspots.Any())
+                    {
+                        _context.Hotspots.AddRange(hotspots);
+                        hotspotCount = hotspots.Count;
+                    }
+                }
             }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true,
+                message = "Çoklu Sayfa AI Analizi Başarılı!",
+                productCount = productCount,
+                hotspotCount = hotspotCount,
+                tablePageNumber = tablePage?.PageNumber,
+                imagePageNumber = imagePage?.PageNumber
+            });
         }
 
         // 6. Kataloğu Yayınla
         [HttpPost("{id}/publish")]
         public async Task<IActionResult> Publish(Guid id)
         {
-            var catalog = await _context.Catalogs. FindAsync(id);
+            var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound();
 
             catalog.Status = "Published";
@@ -301,29 +270,19 @@ namespace Katalogcu.API.Controllers
             var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound("Katalog bulunamadı.");
 
-            var pageIds = await _context.CatalogPages
-                .Where(p => p.CatalogId == id)
-                .Select(p => p.Id)
-                .ToListAsync();
-                
-            var productIds = await _context.Products
-                .Where(p => p.CatalogId == id)
-                .Select(p => p.Id)
-                .ToListAsync();
+            // İlişkili verileri temizle
+            var pageIds = await _context.CatalogPages.Where(p => p.CatalogId == id).Select(p => p.Id).ToListAsync();
+            var productIds = await _context.Products.Where(p => p.CatalogId == id).Select(p => p.Id).ToListAsync();
 
             if (pageIds.Any() || productIds.Any())
             {
-                await _context. Hotspots
-                    .Where(h => pageIds.Contains(h.PageId) || 
-                           (h.ProductId != null && productIds.Contains(h.ProductId. Value)))
+                await _context.Hotspots
+                    .Where(h => pageIds.Contains(h.PageId) || (h.ProductId != null && productIds.Contains(h.ProductId.Value)))
                     .ExecuteDeleteAsync();
             }
 
-            if (pageIds.Any())
-                await _context.CatalogPages. Where(p => pageIds.Contains(p.Id)).ExecuteDeleteAsync();
-                
-            if (productIds.Any())
-                await _context.Products.Where(p => productIds.Contains(p.Id)).ExecuteDeleteAsync();
+            if (pageIds.Any()) await _context.CatalogPages.Where(p => pageIds.Contains(p.Id)).ExecuteDeleteAsync();
+            if (productIds.Any()) await _context.Products.Where(p => productIds.Contains(p.Id)).ExecuteDeleteAsync();
 
             _context.Catalogs.Remove(catalog);
             await _context.SaveChangesAsync();
@@ -331,7 +290,7 @@ namespace Katalogcu.API.Controllers
             return NoContent();
         }
 
-        // 8. Sayfa Ürünlerini ve Hotspot'larını Temizle
+        // 8. Sayfa Verilerini Temizle
         [HttpDelete("{id}/pages/{pageId}/clear")]
         public async Task<IActionResult> ClearPageData(Guid id, Guid pageId)
         {
@@ -341,13 +300,8 @@ namespace Katalogcu.API.Controllers
             var page = await _context.CatalogPages.FindAsync(pageId);
             if (page == null) return NotFound("Sayfa bulunamadı.");
 
-            var deletedHotspots = await _context. Hotspots
-                .Where(h => h.PageId == pageId)
-                .ExecuteDeleteAsync();
-
-            var deletedProducts = await _context. Products
-                .Where(p => p.CatalogId == id && p.PageNumber == page.PageNumber. ToString())
-                .ExecuteDeleteAsync();
+            var deletedHotspots = await _context.Hotspots.Where(h => h.PageId == pageId).ExecuteDeleteAsync();
+            var deletedProducts = await _context.Products.Where(p => p.CatalogId == id && p.PageNumber == page.PageNumber.ToString()).ExecuteDeleteAsync();
 
             return Ok(new
             {
@@ -357,73 +311,24 @@ namespace Katalogcu.API.Controllers
             });
         }
 
-        // 9. PaddleOCR Servis Durumu
-        [AllowAnonymous]
-        [HttpGet("ai-status")]
-        public async Task<IActionResult> GetAiStatus()
+        // --- YARDIMCI METODLAR ---
+
+        /// <summary>
+        /// URL'den (http://localhost/uploads/...) fiziksel dosya yolunu (C:\wwwroot\uploads\...) bulur
+        /// </summary>
+        private string GetPhysicalPath(string url)
         {
-            try
-            {
-                var isHealthy = await _paddleService.IsHealthyAsync();
-                var info = await _paddleService.GetServiceInfoAsync();
+            var fileName = Path.GetFileName(url);
+            
+            // 1. Önce "uploads/pages" klasörüne bak
+            var pathPages = Path.Combine(_env.WebRootPath, "uploads", "pages", fileName);
+            if (System.IO.File.Exists(pathPages)) return pathPages;
 
-                return Ok(new
-                {
-                    healthy = isHealthy,
-                    service = "PaddleOCR",
-                    url = "http://localhost:8000",
-                    info = info
-                });
-            }
-            catch (Exception ex)
-            {
-                return Ok(new
-                {
-                    healthy = false,
-                    service = "PaddleOCR",
-                    error = ex.Message
-                });
-            }
+            // 2. Yoksa "uploads" köküne bak
+            var pathRoot = Path.Combine(_env.WebRootPath, "uploads", fileName);
+            if (System.IO.File.Exists(pathRoot)) return pathRoot;
+
+            return pathPages; // Varsayılan olarak ilk yolu dön
         }
-
-        #region Private Methods
-
-        private void LogAnalysisResult(List<Product> products)
-        {
-            var logData = products.Select(p => new
-            {
-                page_number = p.PageNumber,
-                ref_no = p.RefNo,
-                part_code = p.Code,
-                part_name = p.Name,
-                quantity = p.StockQuantity
-            }).ToList();
-
-            var jsonLog = JsonSerializer.Serialize(logData, new JsonSerializerOptions { WriteIndented = true });
-
-            _logger.LogInformation("=== 🐼 PaddleOCR DATA (Saved to DB) ===");
-            _logger.LogInformation(jsonLog);
-        }
-
-        #endregion
     }
-
-    #region Request Models
-
-    public class AnalyzeRequest
-    {
-        public required string PageId { get; set; }
-        public RectObj? TableRect { get; set; }
-        public RectObj? ImageRect { get; set; }
-    }
-
-    public class MultiPageAnalyzeRequest
-    {
-        public required string TablePageId { get; set; }
-        public RectObj? TableRect { get; set; }
-        public required string ImagePageId { get; set; }
-        public RectObj? ImageRect { get; set; }
-    }
-
-    #endregion
 }

@@ -1,29 +1,37 @@
-using Katalogcu.Infrastructure.Persistence; // ✅ DÜZELTİLDİ: Tek ve doğru satır
+using Katalogcu.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Katalogcu.API.Services;
+using Katalogcu.API.Services; // PartalogAiService burada olmalı
 
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Servislerin Eklendiği Bölüm
 // --------------------------------------------------------
+
+// Yardımcı Servisler
 builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<ExcelService>();
 
+// --- YENİ AI SERVİS ENTEGRASYONU (BAŞLANGIÇ) ---
 
-// YOLO servisi için HttpClient ve servis kaydı
-builder.Services.AddHttpClient<YoloService>();
-builder.Services.AddScoped<YoloService>();
+// appsettings.json dosyasından "AiService" ayarlarını çekiyoruz
+var aiConfig = builder.Configuration.GetSection("AiService");
+string aiBaseUrl = aiConfig["BaseUrl"] ?? "http://localhost:8000"; // Varsayılan Python adresi
 
-builder.Services.AddHttpClient<PaddleTableService>(client =>
+// Merkezi AI Servisini HttpClient ile Kaydediyoruz
+builder.Services.AddHttpClient<IPartalogAiService, PartalogAiService>(client =>
 {
-    client. Timeout = TimeSpan.FromMinutes(2); // Tablo okuma uzun sürebilir
+    client.BaseAddress = new Uri(aiBaseUrl);
+    // Gemini bazen büyük/karışık görsellerde düşünebilir, süre tanıyalım.
+    client.Timeout = TimeSpan.FromMinutes(2); 
 });
-builder.Services.AddScoped<PaddleTableService>();
+
+// --- YENİ AI SERVİS ENTEGRASYONU (BİTİŞ) ---
+
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -32,10 +40,10 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 });
 
 // Veritabanı Bağlantısı
-// (AppDbContext artık yukarıdaki doğru namespace'den geliyor)
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// JWT Authentication Ayarları
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]!);
 
@@ -56,10 +64,12 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtSettings["Issuer"],
         ValidateAudience = true,
         ValidAudience = jwtSettings["Audience"],
-        ValidateLifetime = true, // Süresi dolmuş token'ı reddet
+        ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
 });
+
+// Swagger Konfigürasyonu (Auth Desteği ile)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -91,9 +101,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Swagger Servisleri
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// CORS Ayarları (Frontend Erişimi İçin)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp",
@@ -104,11 +112,8 @@ builder.Services.AddCors(options =>
                   .AllowAnyMethod();
         });
 });
-builder.Services.AddScoped<PdfService>();
 
 var app = builder.Build();
-
-
 
 // 2. Uygulama Çalışma Anı (Middleware)
 // --------------------------------------------------------
@@ -124,7 +129,10 @@ app.UseCors("AllowAngularApp");
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
-app.UseAuthorization();
+
+// Auth Middleware Sırası Önemlidir!
+app.UseAuthentication(); // Önce kimlik doğrula
+app.UseAuthorization();  // Sonra yetki ver
 
 app.MapControllers();
 

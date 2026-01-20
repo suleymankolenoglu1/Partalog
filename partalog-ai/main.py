@@ -1,6 +1,6 @@
 """
-Partalog AI Service - Ana Uygulama (Güncellenmiş)
-YOLO Hotspot Tespiti + EasyOCR Numara Okuma + PaddleOCR Tablo Okuma
+Partalog AI Service - Ana Uygulama (Final Fix)
+YOLO Hotspot Tespiti + EasyOCR Numara Okuma + Gemini 1.5 Flash Tablo Okuma
 """
 
 from fastapi import FastAPI
@@ -11,9 +11,11 @@ from loguru import logger
 import sys
 
 from config import settings
+# Yeni importlar:
+from core.ai_engine import GeminiTableExtractor
+from core.dependencies import set_ai_engine # <-- Dependency Setter
 
-
-# Logging
+# Logging Ayarları
 logger.remove()
 logger.add(
     sys.stdout,
@@ -22,18 +24,16 @@ logger.add(
     colorize=True
 )
 
-
-# Model referansları
+# Model referanslarını tutacağımız global sözlük (YOLO ve OCR için)
 models = {}
 
-
 @asynccontextmanager
-async def lifespan(app:  FastAPI):
+async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} başlatılıyor...")
     logger.info("=" * 60)
     
-    # YOLO Detector
+    # 1. YOLO Detector
     try:
         from core.detector import HotspotDetector
         models["yolo"] = HotspotDetector(
@@ -41,50 +41,51 @@ async def lifespan(app:  FastAPI):
             confidence=settings.YOLO_CONFIDENCE,
             img_size=settings.YOLO_IMG_SIZE
         )
-        logger.success("✅ YOLO Detector yüklendi")
+        logger.success("✅ YOLO Detector yüklendi (Hotspot)")
     except Exception as e:
-        logger.error(f"❌ YOLO:  {e}")
+        logger.error(f"❌ YOLO Başlatılamadı: {e}")
         models["yolo"] = None
     
-    # OCR Reader (EasyOCR - Hotspot numaraları için)
+    # 2. EasyOCR Reader
     try:
         from core.ocr import HotspotOCR
         models["ocr"] = HotspotOCR(use_gpu=settings.OCR_USE_GPU)
-        logger.success("✅ OCR Reader yüklendi (EasyOCR)")
+        logger.success("✅ EasyOCR Reader yüklendi (Numara Okuma)")
     except Exception as e:
-        logger. error(f"❌ OCR: {e}")
+        logger.error(f"❌ EasyOCR Başlatılamadı: {e}")
         models["ocr"] = None
     
-    # PaddleOCR Table Reader (Tablo okuma için)
+    # 3. Gemini AI Engine (ÖNEMLİ DEĞİŞİKLİK BURADA)
     try:
-        from core. table_reader import PaddleTableReader
-        models["table_reader"] = PaddleTableReader(
-            use_gpu=settings. PADDLE_USE_GPU,
-            lang=settings.PADDLE_LANG,
-            show_log=settings.PADDLE_SHOW_LOG,
-            table_max_len=settings. PADDLE_TABLE_MAX_LEN
-        )
-        logger.success("✅ PaddleOCR Table Reader yüklendi")
-    except Exception as e: 
-        logger.error(f"❌ PaddleOCR Table Reader: {e}")
-        models["table_reader"] = None
+        # Motoru başlat
+        gemini_engine = GeminiTableExtractor()
+        
+        # Dependency sistemine kaydet (Böylece api/table.py buna ulaşabilir)
+        set_ai_engine(gemini_engine)
+        
+        # İstersen models sözlüğünde de tutabilirsin (opsiyonel)
+        models["table_reader"] = gemini_engine
+        
+        logger.success("✅ Gemini 1.5 Flash Motoru yüklendi ve Dependency'e atandı.")
+    except Exception as e:
+        logger.critical(f"❌ Gemini AI Motoru Başlatılamadı: {e}")
+        # Hata olsa bile None olarak set etmeyelim, raise etsin ki görelim
     
     logger.info("=" * 60)
-    logger.info("🎯 Servis hazır!")
+    logger.info("🎯 Servis hazır ve çalışıyor!")
     logger.info(f"📍 API Docs: http://localhost:{settings.PORT}/docs")
-    logger.info(f"📍 Test Page: http://localhost:{settings.PORT}/static/test.html")
     logger.info("=" * 60)
     
     yield
     
-    logger. info("👋 Servis kapatılıyor...")
+    logger.info("👋 Servis kapatılıyor...")
+    models.clear()
 
-
-# FastAPI App
+# FastAPI App Tanımlama
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Yedek parça kataloğu için AI görsel işleme servisi - YOLO + EasyOCR + PaddleOCR",
+    description="Partalog AI - YOLO + EasyOCR + Gemini 1.5 Flash",
     lifespan=lifespan
 )
 
@@ -97,10 +98,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Statik Dosyalar
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except Exception:
+    pass
 
-# API Routers
+# API Router'ları Dahil Etme
+# Artık döngüsel import hatası vermeyecek çünkü main.py -> api -> main.py zinciri kırıldı.
 from api.hotspot import router as hotspot_router
 from api.table import router as table_router
 
@@ -113,29 +118,21 @@ async def root():
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "docs": "/docs",
-        "test_page": "/static/test.html",
-        "endpoints": {
-            "detect":  "/api/detect - Hotspot tespit + OCR numara okuma",
-            "extract_table": "/api/table/extract-table - PDF/görüntüden tablo çıkarma",
-            "ocr_image": "/api/table/ocr-image - Görüntüden metin çıkarma",
-            "info": "/api/info - Servis bilgileri"
-        }
+        "mode": "Hybrid (Local YOLO + Cloud Gemini)",
+        "docs": "/docs"
     }
-
 
 @app.get("/health", tags=["Health"])
 async def health():
     return {
         "status": "healthy",
         "models": {
-            "yolo":  models. get("yolo") is not None,
-            "ocr": models.get("ocr") is not None,
-            "table_reader": models.get("table_reader") is not None
+            "yolo_detector": models.get("yolo") is not None,
+            "easyocr": models.get("ocr") is not None,
+            "gemini_ai": models.get("table_reader") is not None
         }
     }
 
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=settings. HOST, port=settings.PORT, reload=settings.DEBUG)
+    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
