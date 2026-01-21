@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Katalogcu.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ea1cb7004469af925e5e257f7026526560908ca")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f32f12cd0e31940020660f1106fd512a6918414b")]
 [assembly: System.Reflection.AssemblyProductAttribute("Katalogcu.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Katalogcu.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
