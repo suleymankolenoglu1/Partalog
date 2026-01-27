@@ -4,8 +4,9 @@ using Katalogcu.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Katalogcu.API.Dtos; // DTO'ları buradan çekiyoruz
+using Katalogcu.API.Dtos;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection; // ✨ Background Scope için gerekli
 
 namespace Katalogcu.API.Controllers
 {
@@ -16,25 +17,69 @@ namespace Katalogcu.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly PdfService _pdfService;
-        private readonly IPartalogAiService _aiService; // ✅ YENİ AI SERVİSİ
+        private readonly IPartalogAiService _aiService;
         private readonly ILogger<CatalogsController> _logger;
-        private readonly IWebHostEnvironment _env; // 📂 Dosya yolu bulucu
+        private readonly IWebHostEnvironment _env;
+        
+        // ✨ YENİ: Arka plan işlemleri için Scope Factory (Processor'ı buradan üreteceğiz)
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public CatalogsController(
             AppDbContext context,
             PdfService pdfService,
             IPartalogAiService aiService,
             ILogger<CatalogsController> logger,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            IServiceScopeFactory scopeFactory) // ✨ Inject ettik
         {
             _context = context;
             _pdfService = pdfService;
             _aiService = aiService;
             _logger = logger;
             _env = env;
+            _scopeFactory = scopeFactory;
         }
 
-        // 1. Tüm Katalogları Listele
+        // ==========================================
+        // 🔥 1. DASHBOARD ISTATISTIKLERI
+        // ==========================================
+        [HttpGet("stats")]
+        public async Task<IActionResult> GetStats()
+        {
+            var totalCatalogs = await _context.Catalogs.CountAsync();
+            var totalParts = await _context.Products.CountAsync();
+            var totalViews = 15240; // Temsili veri
+
+            var pendingCount = await _context.Catalogs
+                .CountAsync(c => c.Status == "Processing" || c.Status == "Pending" || c.Status == "Uploading");
+
+            var recentCatalogs = await _context.Catalogs
+                .OrderByDescending(c => c.CreatedDate)
+                .Take(5)
+                .Select(c => new 
+                {
+                    c.Id,
+                    c.Name,
+                    c.Status,
+                    PartCount = _context.Products.Count(p => p.CatalogId == c.Id),
+                    c.CreatedDate
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                TotalCatalogs = totalCatalogs,
+                TotalParts = totalParts,
+                TotalViews = totalViews,
+                PendingCount = pendingCount,
+                RecentCatalogs = recentCatalogs
+            });
+        }
+
+        // ==========================================
+        // 2. LISTELEME & DETAY
+        // ==========================================
+        
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -45,31 +90,31 @@ namespace Katalogcu.API.Controllers
             return Ok(catalogs);
         }
 
-        // 2. Tek Bir Katalog Getir
+        // 🛑 PERFORMANCE FIX: Ürünleri (Products) buradan kaldırdık. Ayrı çekeceğiz.
+        // 🛑 ROUTING FIX: {id:guid} ile stats çakışmasını önledik.
         [AllowAnonymous]
-        [HttpGet("{id}")]
+        [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var catalog = await _context.Catalogs
                                         .Include(c => c.Pages.OrderBy(p => p.PageNumber))
                                         .ThenInclude(p => p.Hotspots)
-                                        .Include(c => c.Products
-                                            .OrderBy(pr => pr.PageNumber)
-                                            .ThenBy(pr => pr.RefNo)
-                                            .ThenBy(pr => pr.CreatedDate)
-                                        )
+                                        // .Include(c => c.Products...) <-- BURAYI SİLDİK (Hız için)
                                         .FirstOrDefaultAsync(c => c.Id == id);
 
             if (catalog == null) return NotFound("Katalog bulunamadı.");
             return Ok(catalog);
         }
 
-        // 3. Yeni Katalog Ekle
+        // ==========================================
+        // 3. EKLEME & ARKA PLAN İŞLEME (CORE)
+        // ==========================================
+
         [HttpPost]
         public async Task<IActionResult> Create(Catalog catalog)
         {
             catalog.CreatedDate = DateTime.UtcNow;
-            catalog.Status = "Processing";
+            catalog.Status = "Uploading"; 
 
             _context.Catalogs.Add(catalog);
             await _context.SaveChangesAsync();
@@ -96,7 +141,7 @@ namespace Katalogcu.API.Controllers
                     }
                     _context.CatalogPages.AddRange(newPages);
 
-                    catalog.Status = "Draft";
+                    catalog.Status = "ReadyToProcess"; 
                     _context.Catalogs.Update(catalog);
                     await _context.SaveChangesAsync();
                 }
@@ -105,17 +150,86 @@ namespace Katalogcu.API.Controllers
                     _logger.LogError(ex, "PDF işleme hatası");
                     catalog.Status = "Error";
                     await _context.SaveChangesAsync();
+                    return StatusCode(500, "PDF işlenirken hata oluştu.");
                 }
             }
 
             return CreatedAtAction(nameof(GetById), new { id = catalog.Id }, catalog);
         }
 
-        // 4. AI Analizi - TEK SAYFA (Hem Tablo Hem Hotspot)
+        // 🔥 GÜNCELLENMİŞ OTONOM START METODU (FIRE-AND-FORGET) 🚀
+        [HttpPost("{id}/start-ai-process")]
+        public async Task<IActionResult> StartAutonomousProcess(Guid id)
+        {
+            var catalog = await _context.Catalogs.FindAsync(id);
+            if (catalog == null) return NotFound("Katalog bulunamadı.");
+
+            if (catalog.Status == "Processing") 
+                return BadRequest("Bu katalog zaten işleniyor.");
+
+            // Durumu hemen güncelle
+            catalog.Status = "Processing"; 
+            await _context.SaveChangesAsync();
+
+            // 🔥 İşlemi ARKA PLANA at (Task.Run)
+            _ = Task.Run(async () => 
+            {
+                // Yeni scope açıyoruz (Controller kapansa bile bu yaşar)
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    try
+                    {
+                        var scopedProcessor = scope.ServiceProvider.GetRequiredService<CatalogProcessorService>();
+                        
+                        // Uzun süren işlemi başlat
+                        await scopedProcessor.ProcessCatalogAsync(id);
+
+                        // Başarılı olursa durumu güncelle
+                        var scopedContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var cat = await scopedContext.Catalogs.FindAsync(id);
+                        if(cat != null) {
+                            cat.Status = "AI_Completed";
+                            cat.UpdatedDate = DateTime.UtcNow;
+                            await scopedContext.SaveChangesAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Arka plan işlem hatası: {id}");
+                        
+                        // Hata durumunu veritabanına yaz
+                        using (var errorScope = _scopeFactory.CreateScope())
+                        {
+                            var errorDb = errorScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                            var cat = await errorDb.Catalogs.FindAsync(id);
+                            if (cat != null)
+                            {
+                                cat.Status = "Error";
+                                await errorDb.SaveChangesAsync();
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Frontend'e HEMEN cevap ver (202 Accepted)
+            return Accepted(new 
+            { 
+                message = "AI Analizi arka planda başlatıldı.", 
+                catalogId = id,
+                status = "Processing"
+            });
+        }
+
+        // ==========================================
+        // 4. MANUEL ANALİZ METOTLARI (OPSİYONEL)
+        // ==========================================
+
         [HttpPost("{id}/analyze")]
         public async Task<IActionResult> Analyze(Guid id, [FromBody] AnalyzePageRequestDto request)
         {
-            var catalog = await _context.Catalogs.FindAsync(id);
+            // Eski manuel analiz kodu (Aynen kalabilir veya silinebilir)
+             var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound("Katalog bulunamadı.");
 
             var page = await _context.CatalogPages.FirstOrDefaultAsync(p => p.Id == request.PageId);
@@ -127,8 +241,6 @@ namespace Katalogcu.API.Controllers
                 if (!System.IO.File.Exists(filePath))
                     return BadRequest($"Resim dosyası sunucuda bulunamadı: {filePath}");
 
-                // --- A. GEMINI İLE TABLO OKUMA ---
-                // Dosya stream'i açıyoruz
                 using var streamTable = System.IO.File.OpenRead(filePath);
                 var formFileTable = new FormFile(streamTable, 0, streamTable.Length, "file", Path.GetFileName(filePath))
                 {
@@ -138,8 +250,6 @@ namespace Katalogcu.API.Controllers
 
                 var products = await _aiService.ExtractTableAsync(formFileTable, page.PageNumber, id);
 
-                // --- B. YOLO İLE HOTSPOT TESPİTİ ---
-                // Stream kapandığı için yeni bir stream açıyoruz (veya Position=0 yapılabilir ama bu daha güvenli)
                 using var streamHotspot = System.IO.File.OpenRead(filePath);
                 var formFileHotspot = new FormFile(streamHotspot, 0, streamHotspot.Length, "file", Path.GetFileName(filePath))
                 {
@@ -149,24 +259,14 @@ namespace Katalogcu.API.Controllers
 
                 var hotspots = await _aiService.DetectHotspotsAsync(formFileHotspot, page.Id);
 
-                // --- C. KAYDETME ---
-                if (products.Any())
-                {
-                    // Eski ürünleri sil (Opsiyonel: İstersen üstüne ekle)
-                    // _context.Products.RemoveRange(_context.Products.Where(p => p.CatalogId == id && p.PageNumber == page.PageNumber.ToString()));
-                    _context.Products.AddRange(products);
-                }
-
-                if (hotspots.Any())
-                {
-                    _context.Hotspots.AddRange(hotspots);
-                }
+                if (products.Any()) _context.Products.AddRange(products);
+                if (hotspots.Any()) _context.Hotspots.AddRange(hotspots);
 
                 await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
-                    message = "AI Analizi Başarılı (Gemini + YOLO)",
+                    message = "Manuel Analiz Başarılı",
                     productCount = products.Count,
                     hotspotCount = hotspots.Count
                 });
@@ -178,77 +278,16 @@ namespace Katalogcu.API.Controllers
             }
         }
 
-        // 5. AI Analizi - ÇOKLU SAYFA (Tablo Sayfası Ayrı, Resim Sayfası Ayrı)
         [HttpPost("{id}/analyze-multi")]
         public async Task<IActionResult> AnalyzeMultiPage(Guid id, [FromBody] AnalyzeMultiPageRequestDto request)
         {
-            var catalog = await _context.Catalogs.FindAsync(id);
-            if (catalog == null) return NotFound("Katalog bulunamadı.");
-
-            // --- 1. TABLO SAYFASI İŞLEMLERİ (GEMINI) ---
-            var tablePage = await _context.CatalogPages.FindAsync(request.TablePageId);
-            int productCount = 0;
-
-            if (tablePage != null)
-            {
-                var tablePath = GetPhysicalPath(tablePage.ImageUrl);
-                if (System.IO.File.Exists(tablePath))
-                {
-                    using var stream = System.IO.File.OpenRead(tablePath);
-                    var formFile = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(tablePath))
-                    {
-                        Headers = new HeaderDictionary(),
-                        ContentType = "image/jpeg"
-                    };
-
-                    var products = await _aiService.ExtractTableAsync(formFile, tablePage.PageNumber, id);
-                    if (products.Any())
-                    {
-                        _context.Products.AddRange(products);
-                        productCount = products.Count;
-                    }
-                }
-            }
-
-            // --- 2. TEKNİK RESİM SAYFASI İŞLEMLERİ (YOLO) ---
-            var imagePage = await _context.CatalogPages.FindAsync(request.ImagePageId);
-            int hotspotCount = 0;
-
-            if (imagePage != null)
-            {
-                var imagePath = GetPhysicalPath(imagePage.ImageUrl);
-                if (System.IO.File.Exists(imagePath))
-                {
-                    using var stream = System.IO.File.OpenRead(imagePath);
-                    var formFile = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(imagePath))
-                    {
-                        Headers = new HeaderDictionary(),
-                        ContentType = "image/jpeg"
-                    };
-
-                    var hotspots = await _aiService.DetectHotspotsAsync(formFile, imagePage.Id);
-                    if (hotspots.Any())
-                    {
-                        _context.Hotspots.AddRange(hotspots);
-                        hotspotCount = hotspots.Count;
-                    }
-                }
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                success = true,
-                message = "Çoklu Sayfa AI Analizi Başarılı!",
-                productCount = productCount,
-                hotspotCount = hotspotCount,
-                tablePageNumber = tablePage?.PageNumber,
-                imagePageNumber = imagePage?.PageNumber
-            });
+            return Ok(new { message = "Bu endpoint artık otonom sistem tarafından kapsanıyor." });
         }
 
-        // 6. Kataloğu Yayınla
+        // ==========================================
+        // 5. YÖNETİM (YAYINLA / SİL / TEMİZLE)
+        // ==========================================
+
         [HttpPost("{id}/publish")]
         public async Task<IActionResult> Publish(Guid id)
         {
@@ -263,14 +302,12 @@ namespace Katalogcu.API.Controllers
             return Ok(new { message = "Katalog yayına alındı", status = catalog.Status });
         }
 
-        // 7. Katalog Sil
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var catalog = await _context.Catalogs.FindAsync(id);
             if (catalog == null) return NotFound("Katalog bulunamadı.");
 
-            // İlişkili verileri temizle
             var pageIds = await _context.CatalogPages.Where(p => p.CatalogId == id).Select(p => p.Id).ToListAsync();
             var productIds = await _context.Products.Where(p => p.CatalogId == id).Select(p => p.Id).ToListAsync();
 
@@ -290,7 +327,6 @@ namespace Katalogcu.API.Controllers
             return NoContent();
         }
 
-        // 8. Sayfa Verilerini Temizle
         [HttpDelete("{id}/pages/{pageId}/clear")]
         public async Task<IActionResult> ClearPageData(Guid id, Guid pageId)
         {
@@ -311,24 +347,16 @@ namespace Katalogcu.API.Controllers
             });
         }
 
-        // --- YARDIMCI METODLAR ---
-
-        /// <summary>
-        /// URL'den (http://localhost/uploads/...) fiziksel dosya yolunu (C:\wwwroot\uploads\...) bulur
-        /// </summary>
         private string GetPhysicalPath(string url)
         {
             var fileName = Path.GetFileName(url);
-            
-            // 1. Önce "uploads/pages" klasörüne bak
             var pathPages = Path.Combine(_env.WebRootPath, "uploads", "pages", fileName);
             if (System.IO.File.Exists(pathPages)) return pathPages;
 
-            // 2. Yoksa "uploads" köküne bak
             var pathRoot = Path.Combine(_env.WebRootPath, "uploads", fileName);
             if (System.IO.File.Exists(pathRoot)) return pathRoot;
 
-            return pathPages; // Varsayılan olarak ilk yolu dön
+            return pathPages;
         }
     }
 }

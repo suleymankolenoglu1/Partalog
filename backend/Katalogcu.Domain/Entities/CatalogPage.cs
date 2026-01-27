@@ -7,6 +7,8 @@ namespace Katalogcu.Domain.Entities
     {
         public int PageNumber { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
+
+        public string AiDescription { get; set; } = string.Empty;
         
         public Guid CatalogId { get; set; }
         

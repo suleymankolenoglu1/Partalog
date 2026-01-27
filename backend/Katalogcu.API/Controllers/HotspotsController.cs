@@ -7,15 +7,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Katalogcu.API.Controllers
 {
-    [Authorize]
+    // [Authorize] // Geliştirme aşamasında kapalı kalabilir, canlıda açılmalı
     [Route("api/[controller]")]
     [ApiController]
     public class HotspotsController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly IPartalogAiService _aiService; // ✅ YENİ AI SERVİSİ
+        private readonly IPartalogAiService _aiService;
         private readonly ILogger<HotspotsController> _logger;
-        private readonly IWebHostEnvironment _env; // 📂 Dosya yolu bulucu
+        private readonly IWebHostEnvironment _env;
 
         public HotspotsController(
             AppDbContext context, 
@@ -47,7 +47,7 @@ namespace Katalogcu.API.Controllers
                     return BadRequest(new { error = "Sayfanın görüntüsü yok" });
                 }
 
-                // 1. Dosya yolunu bul
+                // Dosya yolunu bul
                 var filePath = GetPhysicalPath(page.ImageUrl);
                 if (!System.IO.File.Exists(filePath))
                 {
@@ -56,7 +56,7 @@ namespace Katalogcu.API.Controllers
 
                 _logger.LogInformation("🔍 Sayfa {PageNumber} için YOLO ile hotspot tespiti başlıyor...", page.PageNumber);
 
-                // 2. Dosyayı Stream Olarak Aç
+                // Dosyayı Stream Olarak Aç
                 using var stream = System.IO.File.OpenRead(filePath);
                 var formFile = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(filePath))
                 {
@@ -64,7 +64,7 @@ namespace Katalogcu.API.Controllers
                     ContentType = "image/jpeg"
                 };
 
-                // 3. AI Servisine Gönder
+                // AI Servisine Gönder (Artık LeftPercent, WidthPercent gibi değerler dönmeli)
                 var detectedHotspots = await _aiService.DetectHotspotsAsync(formFile, pageId);
 
                 if (!detectedHotspots.Any())
@@ -78,8 +78,11 @@ namespace Katalogcu.API.Controllers
                     });
                 }
 
-                // 4. Veritabanına kaydet
-                // (İsteğe bağlı: Önce eski otomatik tespit edilenleri silebilirsin)
+                // ✨ İsteğe Bağlı: Bu sayfa için eski hotspotları temizle (Çakışmayı önlemek için)
+                // var existingHotspots = _context.Hotspots.Where(h => h.PageId == pageId);
+                // _context.Hotspots.RemoveRange(existingHotspots);
+
+                // Veritabanına kaydet
                 _context.Hotspots.AddRange(detectedHotspots);
                 await _context.SaveChangesAsync();
 
@@ -100,23 +103,33 @@ namespace Katalogcu.API.Controllers
             }
         }
 
-        // 2. Yeni Hotspot Ekle (Manuel)
+        // 2. Yeni Hotspot Ekle (Manuel & Frontend Uyumlu)
         [HttpPost]
-        public async Task<IActionResult> Create(Hotspot hotspot)
+        public async Task<IActionResult> Create([FromBody] Hotspot hotspot)
         {
+            if (hotspot == null || hotspot.PageId == Guid.Empty)
+            {
+                return BadRequest("Geçersiz veri.");
+            }
+
             // Sayfa kontrolü
             var page = await _context.CatalogPages.FindAsync(hotspot.PageId);
             if (page == null) return NotFound("Sayfa bulunamadı.");
 
-            // Gerekli alanları doldur
+            // ID ve Tarih ataması
             hotspot.Id = Guid.NewGuid();
             hotspot.CreatedDate = DateTime.UtcNow;
             
-            // Eğer Label boş geldiyse varsayılan bir değer ata
+            // Label boşsa varsayılan ata
             if (string.IsNullOrEmpty(hotspot.Label))
             {
                 hotspot.Label = "?";
             }
+
+            // ✨ GÜVENLİK ÖNLEMİ: Frontend Width/Height göndermediyse varsayılan ata
+            // Frontend'de %3 ve %2 göndermiştik ama garanti olsun.
+            if (hotspot.Width <= 0) hotspot.Width = 3.0;  // %3
+            if (hotspot.Height <= 0) hotspot.Height = 2.0; // %2
 
             _context.Hotspots.Add(hotspot);
             await _context.SaveChangesAsync();
@@ -129,28 +142,30 @@ namespace Katalogcu.API.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var hotspot = await _context.Hotspots.FindAsync(id);
-            if (hotspot == null) return NotFound();
+            if (hotspot == null) return NotFound(new { message = "Hotspot bulunamadı" });
 
             _context.Hotspots.Remove(hotspot);
             await _context.SaveChangesAsync();
-            return NoContent();
+            return NoContent(); // Başarılı silme (204 No Content)
         }
 
         // --- YARDIMCI METODLAR ---
 
         private string GetPhysicalPath(string url)
         {
+            // URL'den sadece dosya adını al (örn: image123.jpg)
             var fileName = Path.GetFileName(url);
             
-            // 1. Önce "uploads/pages" klasörüne bak
+            // 1. Önce "uploads/pages" klasörüne bak (Standart yer)
             var pathPages = Path.Combine(_env.WebRootPath, "uploads", "pages", fileName);
             if (System.IO.File.Exists(pathPages)) return pathPages;
 
-            // 2. Yoksa "uploads" köküne bak
+            // 2. Yoksa "uploads" köküne bak (Alternatif)
             var pathRoot = Path.Combine(_env.WebRootPath, "uploads", fileName);
             if (System.IO.File.Exists(pathRoot)) return pathRoot;
 
-            return pathPages;
+            // Hiçbiri yoksa varsayılan pages yolunu dön (Hata fırlatması için)
+            return pathPages; 
         }
     }
 }

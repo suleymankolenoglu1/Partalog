@@ -3,11 +3,11 @@
 import os
 import json
 import base64
+import time # Time eklendi
 import requests
 from loguru import logger
 from dotenv import load_dotenv
 
-# .env yükle
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -15,26 +15,24 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 class GeminiTableExtractor:
     def __init__(self):
         if not GOOGLE_API_KEY:
-            logger.critical("❌ GOOGLE_API_KEY bulunamadı! .env dosyasını kontrol et.")
-            raise ValueError("Google API Key eksik.")
+            logger.critical("❌ GOOGLE_API_KEY eksik!")
+            raise ValueError("API Key yok.")
         
-        # --- DÜZELTME BURADA ---
-        # "gemini-2.0-flash" (Limit 0 hatası verdi) yerine
-        # Listenizdeki "JOKER" modeli kullanıyoruz. 
-        # Bu model her zaman erişilebilir olan en güncel Flash sürümüdür.
-        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GOOGLE_API_KEY}"
+        # ✅ GÜNCELLENDİ: Diğer dosya ile aynı "Lite" modeli kullanıyoruz.
+        self.api_url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=){GOOGLE_API_KEY}"
         
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
         
-        logger.info("✅ Gemini Flash Latest (Joker Model) başlatıldı.")
+        logger.info("✅ Gemini 2.0 Flash Lite (Table Extractor) hazır.")
 
     def extract_table(self, image_bytes: bytes) -> list:
+        # Basit bir bekleme ekleyelim (Rate Limit koruması için)
+        time.sleep(1) 
+        
         try:
-            # 1. Görüntüyü Base64'e çevir
             b64_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # 2. İstek Gövdesi
             payload = {
                 "contents": [{
                     "parts": [
@@ -64,19 +62,20 @@ class GeminiTableExtractor:
                 }
             }
 
-            # 3. İsteği Gönder
             response = self.session.post(
                 self.api_url,
                 json=payload,
                 timeout=45
             )
 
-            # 4. Hata Kontrolü
             if response.status_code != 200:
-                logger.error(f"Google API Hatası ({response.status_code}): {response.text}")
+                # 429 hatası gelirse loga bas
+                if response.status_code == 429:
+                    logger.warning("⚠️ Tablo okurken kota limiti (429) alındı.")
+                else:
+                    logger.error(f"Google API Hatası ({response.status_code}): {response.text}")
                 return []
             
-            # 5. JSON Parse
             result = response.json()
             try:
                 if 'candidates' in result and result['candidates']:
