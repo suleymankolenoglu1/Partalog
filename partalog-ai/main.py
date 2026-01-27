@@ -1,6 +1,6 @@
 """
-Partalog AI Service - Ana Uygulama (Final Fix)
-YOLO Hotspot Tespiti + EasyOCR Numara Okuma + Gemini 1.5 Flash Tablo Okuma
+Partalog AI Service - Ana Uygulama (Final)
+YOLO Hotspot Tespiti + EasyOCR Numara Okuma + Gemini Tablo Okuma + Gemini Sayfa Analizi (REST)
 """
 
 from fastapi import FastAPI
@@ -9,11 +9,18 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from loguru import logger
 import sys
+import os
+import uvicorn
 
 from config import settings
-# Yeni importlar:
 from core.ai_engine import GeminiTableExtractor
-from core.dependencies import set_ai_engine # <-- Dependency Setter
+from core.dependencies import set_ai_engine 
+
+# --- ROUTER IMPORTLARI ---
+# api klasöründeki routerları buraya çekiyoruz
+from api.hotspot import router as hotspot_router
+from api.table import router as table_router
+from api.analysis import router as analysis_router 
 
 # Logging Ayarları
 logger.remove()
@@ -24,7 +31,7 @@ logger.add(
     colorize=True
 )
 
-# Model referanslarını tutacağımız global sözlük (YOLO ve OCR için)
+# Global Model Deposu (api/hotspot.py buradan erişiyor)
 models = {}
 
 @asynccontextmanager
@@ -33,20 +40,24 @@ async def lifespan(app: FastAPI):
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} başlatılıyor...")
     logger.info("=" * 60)
     
-    # 1. YOLO Detector
-    try:
-        from core.detector import HotspotDetector
-        models["yolo"] = HotspotDetector(
-            model_path=settings.YOLO_MODEL_PATH,
-            confidence=settings.YOLO_CONFIDENCE,
-            img_size=settings.YOLO_IMG_SIZE
-        )
-        logger.success("✅ YOLO Detector yüklendi (Hotspot)")
-    except Exception as e:
-        logger.error(f"❌ YOLO Başlatılamadı: {e}")
+    # 1. YOLO Detector Yükle
+    if os.path.exists(settings.YOLO_MODEL_PATH):
+        try:
+            from core.detector import HotspotDetector
+            models["yolo"] = HotspotDetector(
+                model_path=settings.YOLO_MODEL_PATH,
+                confidence=settings.YOLO_CONFIDENCE,
+                img_size=settings.YOLO_IMG_SIZE
+            )
+            logger.success(f"✅ YOLO Detector yüklendi: {settings.YOLO_MODEL_PATH}")
+        except Exception as e:
+            logger.error(f"❌ YOLO Hatası: {e}")
+            models["yolo"] = None
+    else:
+        logger.warning(f"⚠️ YOLO modeli bulunamadı: {settings.YOLO_MODEL_PATH} (Hotspot tespiti çalışmayacak)")
         models["yolo"] = None
     
-    # 2. EasyOCR Reader
+    # 2. EasyOCR Reader Yükle
     try:
         from core.ocr import HotspotOCR
         models["ocr"] = HotspotOCR(use_gpu=settings.OCR_USE_GPU)
@@ -55,22 +66,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ EasyOCR Başlatılamadı: {e}")
         models["ocr"] = None
     
-    # 3. Gemini AI Engine (ÖNEMLİ DEĞİŞİKLİK BURADA)
+    # 3. Gemini Table Engine (Tablo Okuyucu)
     try:
-        # Motoru başlat
         gemini_engine = GeminiTableExtractor()
-        
-        # Dependency sistemine kaydet (Böylece api/table.py buna ulaşabilir)
-        set_ai_engine(gemini_engine)
-        
-        # İstersen models sözlüğünde de tutabilirsin (opsiyonel)
+        set_ai_engine(gemini_engine) # Dependency Injection için ayarla
         models["table_reader"] = gemini_engine
-        
-        logger.success("✅ Gemini 1.5 Flash Motoru yüklendi ve Dependency'e atandı.")
+        logger.success("✅ Gemini Tablo Motoru yüklendi")
     except Exception as e:
-        logger.critical(f"❌ Gemini AI Motoru Başlatılamadı: {e}")
-        # Hata olsa bile None olarak set etmeyelim, raise etsin ki görelim
+        logger.critical(f"❌ Gemini Tablo Motoru Başlatılamadı: {e}")
     
+    # Not: Analysis servisi (api/analysis.py) stateless olduğu için yükleme gerektirmez.
+
     logger.info("=" * 60)
     logger.info("🎯 Servis hazır ve çalışıyor!")
     logger.info(f"📍 API Docs: http://localhost:{settings.PORT}/docs")
@@ -85,7 +91,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Partalog AI - YOLO + EasyOCR + Gemini 1.5 Flash",
+    description="Partalog AI - YOLO + OCR + Gemini Lite (REST)",
     lifespan=lifespan
 )
 
@@ -98,18 +104,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Statik Dosyalar
-try:
+# Statik Dosyalar (Varsa)
+if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
-except Exception:
-    pass
 
-# API Router'ları Dahil Etme
-# Artık döngüsel import hatası vermeyecek çünkü main.py -> api -> main.py zinciri kırıldı.
-from api.hotspot import router as hotspot_router
-from api.table import router as table_router
+# --- API ROUTER BAĞLANTILARI (URL YOLLARI) ---
 
-app.include_router(hotspot_router, prefix="/api", tags=["Hotspot Detection"])
+# 1. Page Analysis -> /api/analysis/analyze-page-title
+app.include_router(analysis_router, prefix="/api/analysis", tags=["Page Analysis"])
+
+# 2. Hotspot Detection -> /api/hotspot/detect
+# 🛠️ DÜZELTME: Prefix "/api" yerine "/api/hotspot" yapıldı. 
+# Böylece C#'ın beklediği adres oluştu.
+app.include_router(hotspot_router, prefix="/api/hotspot", tags=["Hotspot Detection"])
+
+# 3. Table Extraction -> /api/table/extract
 app.include_router(table_router, prefix="/api/table", tags=["Table Extraction"])
 
 
@@ -118,7 +127,7 @@ async def root():
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "mode": "Hybrid (Local YOLO + Cloud Gemini)",
+        "mode": "Hybrid (YOLO + EasyOCR + Gemini Lite)",
         "docs": "/docs"
     }
 
@@ -129,10 +138,10 @@ async def health():
         "models": {
             "yolo_detector": models.get("yolo") is not None,
             "easyocr": models.get("ocr") is not None,
-            "gemini_ai": models.get("table_reader") is not None
+            "table_engine": models.get("table_reader") is not None,
+            "gemini_api": "Active (Stateless)"
         }
     }
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)

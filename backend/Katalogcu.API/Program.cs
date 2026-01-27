@@ -5,41 +5,51 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Katalogcu.API.Services; // PartalogAiService burada olmalı
+using Katalogcu.API.Services;
+using Microsoft.AspNetCore.Http.Features; 
+using Microsoft.AspNetCore.Server.Kestrel.Core; 
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Servislerin Eklendiği Bölüm
-// --------------------------------------------------------
+// ========================================================
+// 1. SERVİSLERİN KAYDEDİLMESİ (DEPENDENCY INJECTION)
+// ========================================================
+
+// BÜYÜK DOSYA YÜKLEME LİMİTLERİ
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = int.MaxValue;
+    options.MemoryBufferThreshold = int.MaxValue;
+});
+
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = int.MaxValue;
+});
 
 // Yardımcı Servisler
 builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<ExcelService>();
+builder.Services.AddScoped<CatalogProcessorService>();
 
-// --- YENİ AI SERVİS ENTEGRASYONU (BAŞLANGIÇ) ---
-
-// appsettings.json dosyasından "AiService" ayarlarını çekiyoruz
+// AI SERVİS ENTEGRASYONU
 var aiConfig = builder.Configuration.GetSection("AiService");
-string aiBaseUrl = aiConfig["BaseUrl"] ?? "http://localhost:8000"; // Varsayılan Python adresi
+string aiBaseUrl = aiConfig["BaseUrl"] ?? "http://localhost:8000"; 
 
-// Merkezi AI Servisini HttpClient ile Kaydediyoruz
 builder.Services.AddHttpClient<IPartalogAiService, PartalogAiService>(client =>
 {
     client.BaseAddress = new Uri(aiBaseUrl);
-    // Gemini bazen büyük/karışık görsellerde düşünebilir, süre tanıyalım.
-    client.Timeout = TimeSpan.FromMinutes(2); 
+    client.Timeout = TimeSpan.FromMinutes(5); 
 });
 
-// --- YENİ AI SERVİS ENTEGRASYONU (BİTİŞ) ---
-
-
+// Controller ve JSON Ayarları
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    // İlişkisel verilerde sonsuz döngüyü engeller (Parent -> Child -> Parent)
     options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
 });
 
-// Veritabanı Bağlantısı
+// Veritabanı Bağlantısı (PostgreSQL)
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -69,54 +79,50 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Swagger Konfigürasyonu (Auth Desteği ile)
+// Swagger Konfigürasyonu
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Katalogcu API", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. (Örnek: 'Bearer 12345abcdef')",
+        Description = "JWT Authorization header using the Bearer scheme. Örnek: 'Bearer {token}'",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement()
     {
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                },
-                Scheme = "oauth2",
-                Name = "Bearer",
-                In = ParameterLocation.Header,
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" },
+                Scheme = "oauth2", Name = "Bearer", In = ParameterLocation.Header,
             },
             new List<string>()
         }
     });
 });
 
-// CORS Ayarları (Frontend Erişimi İçin)
+// 🔥 CORS AYARLARI (GÜNCELLENDİ)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp",
         policy =>
         {
-            policy.WithOrigins("http://localhost:4200") // Angular'ın adresi
+            policy.WithOrigins("http://localhost:4200", "http://localhost:4200/") // Sondaki slash ihtimaline karşı
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .SetIsOriginAllowed(_ => true); // Localhost'ta bazen IP üzerinden gelirse engellememesi için
         });
 });
 
 var app = builder.Build();
 
-// 2. Uygulama Çalışma Anı (Middleware)
-// --------------------------------------------------------
+// ========================================================
+// 2. MIDDLEWARE (UYGULAMA ÇALIŞMA ANI)
+// ========================================================
 
 if (app.Environment.IsDevelopment())
 {
@@ -124,15 +130,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseStaticFiles(); 
+
+// CORS Her zaman Auth'dan önce gelmelidir!
 app.UseCors("AllowAngularApp");
 
-app.UseHttpsRedirection();
+// Lokal testlerde HTTPS yönlendirmesi bazen 'Connection Refused' hatası verebilir.
+// Eğer sadece http://localhost:5159 üzerinden çalışacaksan burayı geçici olarak kapatabilirsin.
+// app.UseHttpsRedirection(); 
 
-app.UseStaticFiles();
-
-// Auth Middleware Sırası Önemlidir!
-app.UseAuthentication(); // Önce kimlik doğrula
-app.UseAuthorization();  // Sonra yetki ver
+app.UseAuthentication(); 
+app.UseAuthorization();  
 
 app.MapControllers();
 
