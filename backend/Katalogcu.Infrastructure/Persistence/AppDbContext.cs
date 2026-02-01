@@ -15,14 +15,18 @@ namespace Katalogcu.Infrastructure.Persistence
         public DbSet<Product> Products { get; set; }
         public DbSet<CatalogPage> CatalogPages { get; set; }
         public DbSet<Hotspot> Hotspots { get; set; }
-
-        // 🔥 YENİ EKLENEN TABLOLAR
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<CatalogItem> CatalogItems { get; set; }
+        public DbSet<Folder> Folders { get; set; }
 
         // İlişki ve Davranış Ayarları
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // 🔥 KRİTİK ADIM: PostgreSQL Vektör Eklentisini Aktif Et
+            // Bu satır, veritabanına "vector" tipini tanıtır.
+            modelBuilder.HasPostgresExtension("vector");
+
             base.OnModelCreating(modelBuilder);
 
             // 1. Sipariş (Order) ile Kalemleri (OrderItems) arasındaki ilişki
@@ -39,11 +43,9 @@ namespace Katalogcu.Infrastructure.Persistence
                 .WithMany()
                 .HasForeignKey(i => i.ProductId)
                 .OnDelete(DeleteBehavior.Restrict); 
-                // GÜVENLİK: Eğer bir ürün bir siparişte satılmışsa, 
-                // o ürünü 'Products' tablosundan silmeye çalışırsan hata verir. 
-                // (Geçmiş sipariş kaydını bozmamak için).
+                // GÜVENLİK: Eğer bir ürün satılmışsa, Products tablosundan silinemesin.
                 
-            // Fiyat alanları için hassasiyet ayarı (Opsiyonel ama tavsiye edilir)
+            // Fiyat alanları için hassasiyet ayarı
             modelBuilder.Entity<Order>()
                 .Property(o => o.TotalAmount)
                 .HasPrecision(18, 2);

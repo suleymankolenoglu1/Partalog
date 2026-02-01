@@ -1,5 +1,5 @@
 """
-Partalog AI Service - Configuration (Final)
+Partalog AI Service - Configuration (Final v2.1)
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,11 +20,16 @@ class Settings(BaseSettings):
     BASE_DIR: Path = Path(__file__).parent
     MODELS_DIR: Path = Field(default=Path("models"))
     
-    # --- GEMINI AI (YENİ EKLENDİ) ---
-    # Kod içinde 'settings.GEMINI_API_KEY' diyeceğiz,
-    # ama bu gidip .env dosyasındaki 'GOOGLE_API_KEY' değerini okuyacak.
+    # --- GEMINI AI ---
+    # Hem 'GEMINI_API_KEY' hem de 'GOOGLE_API_KEY' olarak gelsen kabul etsin.
+    # .env dosyasında hangisi varsa onu alır.
     GEMINI_API_KEY: str = Field(default="", validation_alias="GOOGLE_API_KEY")
     
+    # --- VERİTABANI (YENİ EKLENDİ) ---
+    # train_dictionary.py artık şifreyi buradan okuyacak.
+    # Varsayılan değer boş, .env dosyasından gelmeli.
+    DB_CONNECTION_STRING: str = Field(default="")
+
     # YOLO
     YOLO_MODEL_PATH: str = Field(default="models/best.pt")
     YOLO_CONFIDENCE: float = Field(default=0.25)
@@ -33,7 +38,7 @@ class Settings(BaseSettings):
     # OCR (EasyOCR - Hotspot için)
     OCR_USE_GPU: bool = Field(default=False)
     
-    # PADDLEOCR (Eski Tablo okuma - Yedek olarak dursun)
+    # PADDLEOCR (Yedek)
     PADDLE_USE_GPU: bool = Field(default=False)
     PADDLE_LANG: str = Field(default="en")
     PADDLE_TABLE_MAX_LEN: int = Field(default=800)

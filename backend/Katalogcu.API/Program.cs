@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. SERVİSLERİN KAYDEDİLMESİ (DEPENDENCY INJECTION)
 // ========================================================
 
-// BÜYÜK DOSYA YÜKLEME LİMİTLERİ
+// BÜYÜK DOSYA YÜKLEME LİMİTLERİ (PDF/Resim için)
 builder.Services.Configure<FormOptions>(options =>
 {
     options.ValueLengthLimit = int.MaxValue;
@@ -28,18 +28,18 @@ builder.Services.Configure<KestrelServerOptions>(options =>
     options.Limits.MaxRequestBodySize = int.MaxValue;
 });
 
+// Genel HttpClient Fabrikası
+builder.Services.AddHttpClient(); 
+
 // Yardımcı Servisler
 builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<CatalogProcessorService>();
 
-// AI SERVİS ENTEGRASYONU
-var aiConfig = builder.Configuration.GetSection("AiService");
-string aiBaseUrl = aiConfig["BaseUrl"] ?? "http://localhost:8000"; 
-
+// 🔥 AI SERVİS ENTEGRASYONU
 builder.Services.AddHttpClient<IPartalogAiService, PartalogAiService>(client =>
 {
-    client.BaseAddress = new Uri(aiBaseUrl);
+    client.BaseAddress = new Uri("http://127.0.0.1:8000/"); 
     client.Timeout = TimeSpan.FromMinutes(5); 
 });
 
@@ -49,13 +49,19 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
 });
 
-// Veritabanı Bağlantısı (PostgreSQL)
+// 🔥 VERİTABANI BAĞLANTISI (PostgreSQL + Vektör Desteği) 🔥
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), x => 
+    {
+        // 🛠️ KRİTİK GÜNCELLEME: 
+        // Bu satır EF Core'a "Vector" tipini native olarak tanımasını söyler.
+        // Böylece "No suitable constructor found for type Vector" hatası çözülür.
+        x.UseVector(); 
+    }));
 
 // JWT Authentication Ayarları
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]!);
+var secretKey = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"] ?? "bu_cok_gizli_ve_uzun_bir_test_anahtaridir_123456");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -70,10 +76,10 @@ builder.Services.AddAuthentication(options =>
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(secretKey),
-        ValidateIssuer = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidateAudience = true,
-        ValidAudience = jwtSettings["Audience"],
+        ValidateIssuer = true, 
+        ValidIssuer = jwtSettings["Issuer"] ?? "KatalogcuAPI",
+        ValidateAudience = true, 
+        ValidAudience = jwtSettings["Audience"] ?? "KatalogcuClient",
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
@@ -84,9 +90,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Katalogcu API", Version = "v1" });
+    
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Örnek: 'Bearer {token}'",
+        Description = "JWT Authorization header. Örnek: 'Bearer {token}'",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
@@ -105,23 +112,24 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 🔥 CORS AYARLARI (GÜNCELLENDİ)
+// CORS AYARLARI
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp",
         policy =>
         {
-            policy.WithOrigins("http://localhost:4200", "http://localhost:4200/") // Sondaki slash ihtimaline karşı
+            policy.WithOrigins("http://localhost:4200", "http://localhost:4200/") 
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .SetIsOriginAllowed(_ => true); // Localhost'ta bazen IP üzerinden gelirse engellememesi için
+                  .SetIsOriginAllowed(_ => true)
+                  .AllowCredentials();
         });
 });
 
 var app = builder.Build();
 
 // ========================================================
-// 2. MIDDLEWARE (UYGULAMA ÇALIŞMA ANI)
+// 2. MIDDLEWARE
 // ========================================================
 
 if (app.Environment.IsDevelopment())
@@ -131,14 +139,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles(); 
-
-// CORS Her zaman Auth'dan önce gelmelidir!
 app.UseCors("AllowAngularApp");
-
-// Lokal testlerde HTTPS yönlendirmesi bazen 'Connection Refused' hatası verebilir.
-// Eğer sadece http://localhost:5159 üzerinden çalışacaksan burayı geçici olarak kapatabilirsin.
-// app.UseHttpsRedirection(); 
-
 app.UseAuthentication(); 
 app.UseAuthorization();  
 

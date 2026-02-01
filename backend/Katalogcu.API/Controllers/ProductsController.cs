@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Katalogcu.API.Services;
+using System.Security.Claims; // ✨ User ID okumak için
 
 namespace Katalogcu.API.Controllers
 {
-    [Authorize] // Varsayılan: Sadece giriş yapanlar
+    [Authorize] // 🔒 Sadece giriş yapanlar
     [Route("api/[controller]")]
     [ApiController]
     public class ProductsController : ControllerBase
@@ -21,26 +22,35 @@ namespace Katalogcu.API.Controllers
             _excelService = excelService;
         }
 
-        // 1. TÜM ÜRÜNLERİ GETİR (Admin Paneli - Envanter Listesi İçin)
-        // 🔥 GÜNCELLENDİ: Katalog ismini de (Join) getiriyor.
+        // 🛠️ Yardımcı Metod: Token'dan UserID'yi (Guid) okur
+        private Guid GetCurrentUserId()
+        {
+            var idString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(idString, out var guid)) return guid;
+            return Guid.Empty;
+        }
+
+        // 1. TÜM ÜRÜNLERİ GETİR (SADECE BENİM OLANLAR)
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+            var userId = GetCurrentUserId();
+
+            // 🔥 DÜZELTME: Sadece giriş yapan kullanıcının kataloglarına bağlı ürünleri getir.
             var products = await _context.Products
-                .Include(p => p.Catalog) // Katalog tablosunu bağla
+                .Include(p => p.Catalog)
+                .Where(p => p.Catalog.UserId == userId) // 🔒 Veri İzolasyonu
                 .OrderByDescending(p => p.CreatedDate)
                 .Select(p => new 
                 {
                     p.Id,
                     p.Code,
                     p.Name,
-                    p.OemNo,          // Yeni UI için lazım
+                    p.OemNo,
                     p.Price,
                     p.StockQuantity,
                     p.ImageUrl,
-                    p.Category,       // "Fren", "Motor" vb.
-                    
-                    // Frontend'de "Bağlı Olduğu Katalog" sütunu için:
+                    p.Category,
                     CatalogName = p.Catalog != null ? p.Catalog.Name : "Genel Stok",
                     CatalogId = p.CatalogId
                 })
@@ -49,14 +59,14 @@ namespace Katalogcu.API.Controllers
             return Ok(products);
         }
 
-        // 2. KATALOĞA GÖRE ÜRÜNLERİ GETİR (Vitrin / PublicView İçin)
-        [AllowAnonymous] // Müşteriler görebilsin
+        // 2. KATALOĞA GÖRE GETİR (Vitrin için açık bırakıldı)
+        [AllowAnonymous]
         [HttpGet("catalog/{catalogId}")]
         public async Task<IActionResult> GetByCatalog(Guid catalogId)
         {
             var products = await _context.Products
                                          .Where(p => p.CatalogId == catalogId)
-                                         .OrderBy(p => p.Code) // Kod sırasına göre gelsin
+                                         .OrderBy(p => p.Code)
                                          .ToListAsync();
             return Ok(products);
         }
@@ -65,7 +75,15 @@ namespace Katalogcu.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(Product product)
         {
-            // Eğer kategori boşsa varsayılan ata
+            var userId = GetCurrentUserId();
+
+            // Güvenlik Kontrolü: Eklenmek istenen katalog bu kullanıcıya mı ait?
+            if (product.CatalogId != null && product.CatalogId != Guid.Empty)
+            {
+                var ownsCatalog = await _context.Catalogs.AnyAsync(c => c.Id == product.CatalogId && c.UserId == userId);
+                if (!ownsCatalog) return BadRequest("Seçilen katalog size ait değil veya bulunamadı.");
+            }
+
             if (string.IsNullOrEmpty(product.Category)) product.Category = "Genel";
 
             product.CreatedDate = DateTime.UtcNow;
@@ -74,39 +92,72 @@ namespace Katalogcu.API.Controllers
             return Ok(product);
         }
         
-        // 4. ÜRÜN SİL
+        // 4. ÜRÜN SİL (GÜÇLENDİRİLMİŞ)
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var userId = GetCurrentUserId();
+
+            // Ürünü ve Kataloğunu bul
+            var product = await _context.Products
+                .Include(p => p.Catalog)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (product == null) return NotFound("Ürün bulunamadı.");
 
-            // İlişkili Hotspot'ları (resim üzerindeki noktalar) temizle
-            var linkedHotspots = await _context.Hotspots.Where(h => h.ProductId == id).ToListAsync();
-            if (linkedHotspots.Any())
+            // 🔒 YETKİ KONTROLÜ: Ürün bir kataloğa bağlıysa, o katalog benim mi?
+            if (product.Catalog != null && product.Catalog.UserId != userId)
             {
-                _context.Hotspots.RemoveRange(linkedHotspots);
+                return Unauthorized("Bu ürünü silme yetkiniz yok.");
             }
 
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
-            return NoContent();
+            try 
+            {
+                // A. Hotspotları Temizle
+                var linkedHotspots = await _context.Hotspots.Where(h => h.ProductId == id).ToListAsync();
+                if (linkedHotspots.Any())
+                {
+                    _context.Hotspots.RemoveRange(linkedHotspots);
+                }
+
+                // B. 🔥 SİPARİŞ KALEMLERİNİ TEMİZLE (FK Hatasını Önler)
+                var orderItems = await _context.OrderItems.Where(oi => oi.ProductId == id).ToListAsync();
+                if (orderItems.Any())
+                {
+                    _context.OrderItems.RemoveRange(orderItems);
+                }
+
+                // C. Ürünü Sil
+                _context.Products.Remove(product);
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Silme hatası: {ex.Message}");
+            }
         }
 
         // 5. EXCEL İLE TOPLU YÜKLEME
         [HttpPost("import")]
-        public async Task<IActionResult> Import([FromForm] IFormFile file, [FromForm] Guid? catalogId)
+        public async Task<IActionResult> Import(IFormFile file, [FromForm] Guid? catalogId)
         {
+            var userId = GetCurrentUserId();
+
             if (file == null || file.Length == 0)
                 return BadRequest("Lütfen bir Excel dosyası yükleyin.");
 
+            // 🔒 Güvenlik: Eğer bir kataloğa yükleme yapılıyorsa, katalog kullanıcının mı?
+            if (catalogId.HasValue && catalogId != Guid.Empty)
+            {
+                var ownsCatalog = await _context.Catalogs.AnyAsync(c => c.Id == catalogId && c.UserId == userId);
+                if (!ownsCatalog) return BadRequest("Seçilen katalog size ait değil.");
+            }
+
             try 
             {
-                // catalogId null gelebilir (Genel stok yüklemesi için)
                 var targetCatalogId = catalogId ?? Guid.Empty; 
 
-                // Excel servisinin Guid? desteklediğinden emin olalım, değilse servisi güncellemek gerekebilir
-                // Şimdilik varsayım: ParseProducts(file, Guid catalogId) şeklinde.
                 var products = _excelService.ParseProducts(file, targetCatalogId);
 
                 if (products.Count == 0)

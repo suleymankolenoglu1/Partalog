@@ -3,25 +3,26 @@ using System;
 using Katalogcu.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Pgvector;
 
 #nullable disable
 
 namespace Katalogcu.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260131113256_AddFolderTable")]
+    partial class AddFolderTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.AppUser", b =>
@@ -127,9 +128,6 @@ namespace Katalogcu.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Vector>("Embedding")
-                        .HasColumnType("vector(768)");
-
                     b.Property<string>("PageNumber")
                         .IsRequired()
                         .HasColumnType("text");
@@ -142,7 +140,7 @@ namespace Katalogcu.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("RefNumber")
+                    b.Property<string>("RefNo")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -150,8 +148,6 @@ namespace Katalogcu.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CatalogId");
 
                     b.ToTable("CatalogItems");
                 });
@@ -412,17 +408,6 @@ namespace Katalogcu.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogItem", b =>
-                {
-                    b.HasOne("Katalogcu.Domain.Entities.Catalog", "Catalog")
-                        .WithMany("Items")
-                        .HasForeignKey("CatalogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Catalog");
-                });
-
             modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogPage", b =>
                 {
                     b.HasOne("Katalogcu.Domain.Entities.Catalog", "Catalog")
@@ -483,8 +468,6 @@ namespace Katalogcu.Infrastructure.Migrations
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.Catalog", b =>
                 {
-                    b.Navigation("Items");
-
                     b.Navigation("Pages");
 
                     b.Navigation("Products");
