@@ -1,15 +1,17 @@
 services:
   db:
-    image: postgres:latest
+    # 👇 DEĞİŞİKLİK BURADA: Standart 'postgres' yerine 'pgvector' imajını kullanıyoruz.
+    # Bu imaj, PostgreSQL 16 üzerine kurulmuş pgvector eklentisini içerir.
+    image: pgvector/pgvector:pg16
     container_name: katalogcu_db
     environment:
-      POSTGRES_USER: postgres      # Burası postgres kalsın
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: Password123!
       POSTGRES_DB: KatalogcuDb
     ports:
       - "5432:5432"
     volumes:
-      - pgdata_new:/var/lib/postgresql/data  # 👈 İSMİ DEĞİŞTİRDİK!
+      - pgdata_new:/var/lib/postgresql/data
 
 volumes:
-  pgdata_new:  # 👈 BURAYI DA DEĞİŞTİRDİK!
+  pgdata_new:

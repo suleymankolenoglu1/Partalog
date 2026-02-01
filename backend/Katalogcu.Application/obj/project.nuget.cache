@@ -1,8 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "Yp5QVTRxPbU=",
+  "dgSpecHash": "n3UKsOnN+D4=",
   "success": true,
   "projectFilePath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "/Users/suleymankolenoglu/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.0/microsoft.extensions.dependencyinjection.abstractions.8.0.0.nupkg.sha512",
+    "/Users/suleymankolenoglu/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.0/microsoft.extensions.logging.abstractions.8.0.0.nupkg.sha512",
+    "/Users/suleymankolenoglu/.nuget/packages/npgsql/8.0.5/npgsql.8.0.5.nupkg.sha512",
+    "/Users/suleymankolenoglu/.nuget/packages/pgvector/0.3.2/pgvector.0.3.2.nupkg.sha512"
+  ],
   "logs": []
 }

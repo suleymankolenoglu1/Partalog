@@ -13,4 +13,4 @@ node_modules/
 dist/
 .angular/
 .DS_Store
-
+.sanayi_sozlugu.json

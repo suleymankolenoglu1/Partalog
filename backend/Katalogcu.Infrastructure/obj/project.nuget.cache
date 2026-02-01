@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "QJs4gJ/YQFI=",
+  "dgSpecHash": "STwl3HsFcW0=",
   "success": true,
   "projectFilePath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Infrastructure/Katalogcu.Infrastructure.csproj",
   "expectedPackageFiles": [
@@ -19,6 +19,7 @@
     "/Users/suleymankolenoglu/.nuget/packages/microsoft.extensions.primitives/9.0.0/microsoft.extensions.primitives.9.0.0.nupkg.sha512",
     "/Users/suleymankolenoglu/.nuget/packages/npgsql/9.0.0/npgsql.9.0.0.nupkg.sha512",
     "/Users/suleymankolenoglu/.nuget/packages/npgsql.entityframeworkcore.postgresql/9.0.0/npgsql.entityframeworkcore.postgresql.9.0.0.nupkg.sha512",
+    "/Users/suleymankolenoglu/.nuget/packages/pgvector/0.3.2/pgvector.0.3.2.nupkg.sha512",
     "/Users/suleymankolenoglu/.nuget/packages/system.text.json/9.0.0/system.text.json.9.0.0.nupkg.sha512"
   ],
   "logs": []

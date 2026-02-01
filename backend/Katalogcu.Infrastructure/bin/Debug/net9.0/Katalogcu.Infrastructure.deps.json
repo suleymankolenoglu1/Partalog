@@ -178,6 +178,17 @@
           }
         }
       },
+      "Pgvector/0.3.2": {
+        "dependencies": {
+          "Npgsql": "9.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/Pgvector.dll": {
+            "assemblyVersion": "0.3.2.0",
+            "fileVersion": "0.3.2.0"
+          }
+        }
+      },
       "System.Text.Json/9.0.0": {},
       "Katalogcu.Application/1.0.0": {
         "dependencies": {
@@ -191,6 +202,9 @@
         }
       },
       "Katalogcu.Domain/1.0.0": {
+        "dependencies": {
+          "Pgvector": "0.3.2"
+        },
         "runtime": {
           "Katalogcu.Domain.dll": {
             "assemblyVersion": "1.0.0.0",
@@ -310,6 +324,13 @@
       "sha512": "sha512-ObngKFRLMBAeMqQzK7SC0Q6WZtWw0imPmEkVPo12yLVF3fioz2TN+w0mhNMJ5cVd/sLB2u+jei0bmA9sDMtkMw==",
       "path": "npgsql.entityframeworkcore.postgresql/9.0.0",
       "hashPath": "npgsql.entityframeworkcore.postgresql.9.0.0.nupkg.sha512"
+    },
+    "Pgvector/0.3.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-n7M5LuNejHUmtWky3zCbNO+tP1Gnjiuv9Qtu4LyvB1602dD8RiBxxCQp9jEjM0ZFDxAZF1oOWkNIkXw46KT00Q==",
+      "path": "pgvector/0.3.2",
+      "hashPath": "pgvector.0.3.2.nupkg.sha512"
     },
     "System.Text.Json/9.0.0": {
       "type": "package",

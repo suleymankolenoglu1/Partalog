@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 
 #nullable disable
 
@@ -20,6 +21,7 @@ namespace Katalogcu.Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.AppUser", b =>
@@ -75,6 +77,9 @@ namespace Katalogcu.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("FolderId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("text");
@@ -99,9 +104,56 @@ namespace Katalogcu.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FolderId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("Catalogs");
+                });
+
+            modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CatalogId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Vector>("Embedding")
+                        .HasColumnType("vector(768)");
+
+                    b.Property<string>("PageNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PartCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PartName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RefNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogId");
+
+                    b.ToTable("CatalogItems");
                 });
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogPage", b =>
@@ -135,6 +187,27 @@ namespace Katalogcu.Infrastructure.Migrations
                     b.HasIndex("CatalogId");
 
                     b.ToTable("CatalogPages");
+                });
+
+            modelBuilder.Entity("Katalogcu.Domain.Entities.Folder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Folders");
                 });
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.Hotspot", b =>
@@ -324,13 +397,30 @@ namespace Katalogcu.Infrastructure.Migrations
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.Catalog", b =>
                 {
+                    b.HasOne("Katalogcu.Domain.Entities.Folder", "Folder")
+                        .WithMany("Catalogs")
+                        .HasForeignKey("FolderId");
+
                     b.HasOne("Katalogcu.Domain.Entities.AppUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Folder");
+
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogItem", b =>
+                {
+                    b.HasOne("Katalogcu.Domain.Entities.Catalog", "Catalog")
+                        .WithMany("Items")
+                        .HasForeignKey("CatalogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Catalog");
                 });
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogPage", b =>
@@ -393,6 +483,8 @@ namespace Katalogcu.Infrastructure.Migrations
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.Catalog", b =>
                 {
+                    b.Navigation("Items");
+
                     b.Navigation("Pages");
 
                     b.Navigation("Products");
@@ -401,6 +493,11 @@ namespace Katalogcu.Infrastructure.Migrations
             modelBuilder.Entity("Katalogcu.Domain.Entities.CatalogPage", b =>
                 {
                     b.Navigation("Hotspots");
+                });
+
+            modelBuilder.Entity("Katalogcu.Domain.Entities.Folder", b =>
+                {
+                    b.Navigation("Catalogs");
                 });
 
             modelBuilder.Entity("Katalogcu.Domain.Entities.Order", b =>

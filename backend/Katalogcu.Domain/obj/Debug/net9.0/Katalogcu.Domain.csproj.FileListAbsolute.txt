@@ -22,3 +22,4 @@
 /home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/refint/Katalogcu.Domain.dll
 /home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.pdb
 /home/runner/work/Katalogcu/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/ref/Katalogcu.Domain.dll
+/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/obj/Debug/net9.0/Katalogcu.Domain.csproj.AssemblyReference.cache

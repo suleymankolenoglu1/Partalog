@@ -1,26 +1,37 @@
 """
-Partalog AI Service - Ana Uygulama (Final)
-YOLO Hotspot Tespiti + EasyOCR Numara Okuma + Gemini Tablo Okuma + Gemini Sayfa Analizi (REST)
+Partalog AI Service - Ana Uygulama (Final v2.2 - Semantic Search Added)
+YOLO Hotspot + OCR + Gemini Analysis + AI Chat + Embeddings
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from loguru import logger
+from pydantic import BaseModel
 import sys
 import os
 import uvicorn
+import importlib
+import requests  # REST API isteği için eklendi
 
+# Kendi modüllerimiz
 from config import settings
 from core.ai_engine import GeminiTableExtractor
 from core.dependencies import set_ai_engine 
 
 # --- ROUTER IMPORTLARI ---
-# api klasöründeki routerları buraya çekiyoruz
 from api.hotspot import router as hotspot_router
 from api.table import router as table_router
-from api.analysis import router as analysis_router 
+from api.analysis import router as analysis_router
+from api.chat import router as chat_router 
+
+# --- EĞİTİM MODÜLÜ (Opsiyonel import) ---
+try:
+    import train_dictionary
+except ImportError:
+    logger.warning("⚠️ 'train_dictionary.py' bulunamadı. Admin eğitim endpoint'i çalışmayabilir.")
+    train_dictionary = None
 
 # Logging Ayarları
 logger.remove()
@@ -31,7 +42,7 @@ logger.add(
     colorize=True
 )
 
-# Global Model Deposu (api/hotspot.py buradan erişiyor)
+# Global Model Deposu
 models = {}
 
 @asynccontextmanager
@@ -40,6 +51,19 @@ async def lifespan(app: FastAPI):
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} başlatılıyor...")
     logger.info("=" * 60)
     
+    # 0. SÖZLÜK KONTROLÜ
+    dict_path = "sanayi_sozlugu.json"
+    if os.path.exists(dict_path):
+        import json
+        try:
+            with open(dict_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            logger.success(f"🧠 Sanayi Hafızası Yüklü: {len(data)} terim biliniyor.")
+        except:
+            logger.error("❌ Sanayi sözlüğü dosyası bozuk.")
+    else:
+        logger.warning("⚠️ Sanayi sözlüğü bulunamadı. '/api/admin/train' ile eğitimi başlatın.")
+
     # 1. YOLO Detector Yükle
     if os.path.exists(settings.YOLO_MODEL_PATH):
         try:
@@ -54,29 +78,27 @@ async def lifespan(app: FastAPI):
             logger.error(f"❌ YOLO Hatası: {e}")
             models["yolo"] = None
     else:
-        logger.warning(f"⚠️ YOLO modeli bulunamadı: {settings.YOLO_MODEL_PATH} (Hotspot tespiti çalışmayacak)")
+        logger.warning(f"⚠️ YOLO modeli bulunamadı: {settings.YOLO_MODEL_PATH}")
         models["yolo"] = None
     
     # 2. EasyOCR Reader Yükle
     try:
         from core.ocr import HotspotOCR
         models["ocr"] = HotspotOCR(use_gpu=settings.OCR_USE_GPU)
-        logger.success("✅ EasyOCR Reader yüklendi (Numara Okuma)")
+        logger.success("✅ EasyOCR Reader yüklendi")
     except Exception as e:
         logger.error(f"❌ EasyOCR Başlatılamadı: {e}")
         models["ocr"] = None
     
-    # 3. Gemini Table Engine (Tablo Okuyucu)
+    # 3. Gemini Table Engine
     try:
         gemini_engine = GeminiTableExtractor()
-        set_ai_engine(gemini_engine) # Dependency Injection için ayarla
+        set_ai_engine(gemini_engine) 
         models["table_reader"] = gemini_engine
         logger.success("✅ Gemini Tablo Motoru yüklendi")
     except Exception as e:
         logger.critical(f"❌ Gemini Tablo Motoru Başlatılamadı: {e}")
     
-    # Not: Analysis servisi (api/analysis.py) stateless olduğu için yükleme gerektirmez.
-
     logger.info("=" * 60)
     logger.info("🎯 Servis hazır ve çalışıyor!")
     logger.info(f"📍 API Docs: http://localhost:{settings.PORT}/docs")
@@ -91,7 +113,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Partalog AI - YOLO + OCR + Gemini Lite (REST)",
+    description="Partalog AI - Complete Suite (Detection + OCR + Analysis + Chat + Embeddings)",
     lifespan=lifespan
 )
 
@@ -104,22 +126,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Statik Dosyalar (Varsa)
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- API ROUTER BAĞLANTILARI (URL YOLLARI) ---
-
-# 1. Page Analysis -> /api/analysis/analyze-page-title
+# --- API ROUTER BAĞLANTILARI ---
 app.include_router(analysis_router, prefix="/api/analysis", tags=["Page Analysis"])
-
-# 2. Hotspot Detection -> /api/hotspot/detect
-# 🛠️ DÜZELTME: Prefix "/api" yerine "/api/hotspot" yapıldı. 
-# Böylece C#'ın beklediği adres oluştu.
 app.include_router(hotspot_router, prefix="/api/hotspot", tags=["Hotspot Detection"])
-
-# 3. Table Extraction -> /api/table/extract
 app.include_router(table_router, prefix="/api/table", tags=["Table Extraction"])
+app.include_router(chat_router, prefix="/api/chat", tags=["AI Chat"]) 
+
+# --- 🔥 YENİ: EMBEDDING ENDPOINT (REST API) ---
+class EmbeddingRequest(BaseModel):
+    text: str
+
+@app.post("/api/embed", tags=["Semantic Search"])
+async def generate_embedding(req: EmbeddingRequest):
+    """
+    Metni 768 boyutlu vektöre çevirir (Google Gemini text-embedding-004).
+    """
+    # API Key'i config'den alıyoruz. 
+    # Config dosyanızda GEMINI_API_KEY olduğundan emin olun.
+    api_key = getattr(settings, "GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+    
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY ayarlanmamış!")
+
+    model_name = "models/text-embedding-004"
+    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={api_key}"
+    
+    payload = {
+        "model": model_name,
+        "content": {"parts": [{"text": req.text}]}
+    }
+    
+    try:
+        # Doğrudan REST isteği (Kütüphane bağımsız)
+        response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+        
+        if response.status_code != 200:
+            logger.error(f"Gemini API Hatası: {response.text}")
+            raise HTTPException(status_code=response.status_code, detail=f"Gemini Error: {response.text}")
+
+        data = response.json()
+        vector = data.get("embedding", {}).get("values")
+        
+        if not vector:
+             raise HTTPException(status_code=500, detail="Vektör alınamadı (Boş yanıt).")
+
+        return {"embedding": vector}
+
+    except Exception as e:
+        logger.error(f"Embedding Hatası: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- ADMIN EĞİTİM ENDPOINT'İ ---
+@app.post("/api/admin/train", tags=["Admin & Training"])
+async def trigger_training(background_tasks: BackgroundTasks):
+    if train_dictionary:
+        background_tasks.add_task(train_dictionary.main)
+        return {
+            "status": "started", 
+            "message": "Eğitim arka planda başlatıldı."
+        }
+    else:
+        return {"status": "error", "message": "train_dictionary.py modülü bulunamadı."}
 
 
 @app.get("/", tags=["Health"])
@@ -127,19 +198,21 @@ async def root():
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "mode": "Hybrid (YOLO + EasyOCR + Gemini Lite)",
+        "features": ["YOLO", "EasyOCR", "Gemini Tables", "Embeddings", "Expert Chat"],
         "docs": "/docs"
     }
 
 @app.get("/health", tags=["Health"])
 async def health():
+    dict_exists = os.path.exists("sanayi_sozlugu.json")
     return {
         "status": "healthy",
         "models": {
             "yolo_detector": models.get("yolo") is not None,
             "easyocr": models.get("ocr") is not None,
             "table_engine": models.get("table_reader") is not None,
-            "gemini_api": "Active (Stateless)"
+            "embedding_service": "Active (REST API)",
+            "dictionary_loaded": dict_exists
         }
     }
 
