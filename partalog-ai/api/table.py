@@ -20,14 +20,15 @@ router = APIRouter()
 
 # ✅ MODEL: gemini-2.0-flash-lite
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={settings.GEMINI_API_KEY}"
+
 # --- Schemas ---
 
 # 1. Parça Sonuç Modeli (GÜNCELLENDİ)
 class ProductResult(BaseModel):
-    ref_number: str = Field(default="0") # String yaptık ("12-1" gibi ref no olabilir)
+    ref_number: str = Field(default="0")
     part_code: str
-    part_name: str
-    description: str = Field(default="") # 🔥 YENİ: "FOR B48" gibi özellikler buraya
+    part_name: str = Field(default="Unknown Part") # Varsayılan değer eklendi
+    description: str = Field(default="")
     quantity: int = Field(default=1)
 
 class TableResult(BaseModel):
@@ -49,12 +50,11 @@ class MetadataResponse(BaseModel):
 
 # --- Endpoints ---
 
-# A. KAPAK ANALİZİ (YENİ ENDPOINT)
+# A. KAPAK ANALİZİ
 @router.post("/extract-metadata", response_model=MetadataResponse)
 async def extract_metadata(file: UploadFile = File(...)):
     """
     Sadece 1. sayfayı (Kapağı) okur ve Makine Modelini bulur.
-    Örn: "MF-7500-C11"
     """
     try:
         content = await file.read()
@@ -98,7 +98,7 @@ async def extract_metadata(file: UploadFile = File(...)):
         return MetadataResponse(machine_model="Error", catalog_title="Error")
 
 
-# B. TABLO AYIKLAMA (GÜNCELLENDİ)
+# B. TABLO AYIKLAMA (GÜNCELLENDİ - V3: TAM KORUMALI)
 @router.post("/extract", response_model=TableExtractionResponse)
 async def extract_table(
     file: UploadFile = File(...),
@@ -111,34 +111,33 @@ async def extract_table(
     try:
         content = await file.read()
         image = Image.open(io.BytesIO(content)).convert("RGB")
-        image.thumbnail((1024, 1024))
+        image.thumbnail((1500, 1500)) # Okunabilirliği artırmak için çözünürlük artırıldı
         buffered = io.BytesIO()
-        image.save(buffered, format="JPEG", quality=90)
+        image.save(buffered, format="JPEG", quality=95)
         base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
     except Exception as e:
         logger.error(f"❌ Resim hatası: {e}")
         return _empty_response()
 
-    # 2. PROMPT (GÜNCELLENDİ: Nitelik Ayrıştırma)
-    # Artık "Remarks" (Özellik) sütununu ayrı istiyoruz.
+    # 2. PROMPT (GÜÇLENDİRİLDİ)
     prompt_text = """
-    Extract the Spare Parts Table from this image into a clean JSON structure.
+    Analyze this Sewing Machine Parts Catalog page. Extract the table into JSON.
 
-    STRICT RULES:
-    1. **COLUMNS:** Identify Ref No, Part Code, Part Name, and Remarks (Gauge/Spec).
-    2. **SPLIT NAMES:** If a line says "THROAT PLATE FOR B48", split it:
-       - part_name: "THROAT PLATE"
-       - remarks: "FOR B48"
-    3. **NO TRANSLATION:** Keep English terms exactly as seen.
-    4. **ACCURACY:** Part codes must be character-perfect.
-    
+    CRITICAL RULES:
+    1. **FIND THE PART NAME:** The Part Name is MANDATORY. It is usually to the right of the Part Code.
+    2. **DO NOT LEAVE NAME EMPTY:** If you see text like "SCREW" or "NUT", that is the Name, NOT Remarks.
+    3. **REMARKS vs NAME:** - "SCREW 1/8-44 L=6" -> Name: "SCREW", Remarks: "1/8-44 L=6"
+       - If you are unsure, put EVERYTHING in "part_name". Better a long name than an empty one.
+    4. **ACCURACY:** Part codes must be character-perfect (e.g. 133-50301).
+    5. **NO TRANSLATION:** Keep text exactly as in the image (English).
+
     RETURN JSON FORMAT:
     [
       {
         "ref_no": "1", 
-        "part_code": "13353909", 
-        "part_name": "MAIN FEED DOG", 
-        "remarks": "FOR B56",
+        "part_code": "13350301", 
+        "part_name": "NEEDLE HEAD", 
+        "remarks": "",
         "qty": "1"
       }
     ]
@@ -154,9 +153,9 @@ async def extract_table(
         "generationConfig": {"response_mime_type": "application/json"}
     }
 
-    # 3. İstek At (TURTLE MODE 🐢)
-    max_retries = 5       
-    base_delay = 5       
+    # 3. İstek At (Retry Mekanizması)
+    max_retries = 3       
+    base_delay = 2       
     raw_data = []
 
     async with aiohttp.ClientSession() as session:
@@ -170,12 +169,19 @@ async def extract_table(
                         
                         txt = res["candidates"][0]["content"]["parts"][0]["text"]
                         clean_txt = txt.replace("```json", "").replace("```", "").strip()
-                        raw_data = json.loads(clean_txt)
+                        try:
+                            # Bazen JSON'un sonu bozuk gelebilir, onu düzeltiyoruz
+                            if clean_txt.endswith(",]"): clean_txt = clean_txt[:-2] + "]"
+                            raw_data = json.loads(clean_txt)
+                        except:
+                            # Çok bozuksa bir daha dene
+                            continue
+                            
                         logger.info(f"✅ Gemini {len(raw_data)} satır veri buldu (Sayfa {page_number})")
                         break
                     
                     elif response.status in [429, 503]:
-                        wait_time = (base_delay * (1.5 ** attempt)) + (random.randint(0, 1000) / 1000)
+                        wait_time = (base_delay * (1.5 ** attempt))
                         logger.warning(f"⏳ Kota Doldu. {wait_time:.1f}sn bekleniyor...")
                         await asyncio.sleep(wait_time)
                         continue
@@ -184,10 +190,10 @@ async def extract_table(
                         break
             except Exception as e:
                 logger.error(f"❌ Bağlantı Hatası: {e}")
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
                 continue
 
-    if len(raw_data) > 250:
+    if len(raw_data) > 300: # Index sayfası koruması
         return _empty_response(f"Index sayfası ({len(raw_data)} satır).")
 
     products = []
@@ -195,14 +201,23 @@ async def extract_table(
         try:
             # Code Cleaning
             p_code = str(item.get("part_code") or item.get("Part Number") or item.get("code") or "").strip()
-            if len(p_code) < 2: continue
+            if len(p_code) < 2: continue # Çok kısa kodları atla
 
             # Ref No Cleaning
             ref_raw = str(item.get("ref_no") or item.get("ref") or "0")
             
-            # Name & Remarks Cleaning
+            # 🔥 SİGORTA MEKANİZMASI (SMART FALLBACK) 🔥
             p_name = str(item.get("part_name") or item.get("description") or "").strip()
-            p_desc = str(item.get("remarks") or item.get("gauge") or "").strip() # 🔥 Burası Yeni
+            p_desc = str(item.get("remarks") or item.get("gauge") or "").strip()
+
+            # Senaryo 1: İsim BOŞ ama Açıklama DOLU ise -> Açıklamayı isim yap
+            if not p_name and p_desc:
+                p_name = p_desc
+                # p_desc = "" # Açıklamayı silmiyoruz, kalsın
+
+            # Senaryo 2: İsim HALA BOŞ ise -> "Unknown Part" yap
+            if not p_name:
+                p_name = "Unknown Part"
 
             # Qty Cleaning
             qty_raw = str(item.get("qty") or "1")
@@ -210,10 +225,10 @@ async def extract_table(
             qty_val = int(qty_clean) if qty_clean else 1
 
             products.append(ProductResult(
-                ref_number=ref_raw, # String olarak saklıyoruz
+                ref_number=ref_raw, 
                 part_code=p_code,
                 part_name=p_name,
-                description=p_desc, # C# tarafındaki 'Description' alanına gidecek
+                description=p_desc, 
                 quantity=qty_val
             ))
         except:

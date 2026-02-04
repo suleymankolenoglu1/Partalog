@@ -18,4 +18,4 @@ data/vector_db/
 # models/*.pt
 # models/*.pth
 
-
+*.sanayi_sozlugu.json

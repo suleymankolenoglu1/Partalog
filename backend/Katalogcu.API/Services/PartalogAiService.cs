@@ -9,23 +9,22 @@ namespace Katalogcu.API.Services;
 // --- ARAYÜZ (INTERFACE) ---
 public interface IPartalogAiService
 {
-    // 1. YOLO
+    // 1. YOLO (Resimdeki Parçaları Bulma)
     Task<List<Hotspot>> DetectHotspotsAsync(IFormFile file, Guid pageId);
     
-    // 2. GEMINI Tablo
+    // 2. GEMINI (Tablo Okuma)
     Task<List<ProductItemDto>> ExtractTableAsync(byte[] fileBytes, int pageNumber);
     
-    // 3. Sayfa Analizi
+    // 3. Sayfa Analizi (Teknik Çizim mi?)
     Task<PageAnalysisResult> AnalyzePageAsync(byte[] fileBytes);
     
-    // 4. CHAT (Geçmiş Destekli)
+    // 4. EXPERT CHAT (Yedek Parça Asistanı)
     Task<AiChatResponseDto> GetExpertChatResponseAsync(AiChatRequestDto request);
 
-    // 5. EĞİTİM TETİKLEYİCİ
+    // 5. EĞİTİM TETİKLEYİCİ (Admin)
     Task TriggerTrainingAsync();
 
-    // 6. 🔥 YENİ: METİN VEKTÖRLEŞTİRME (SEMANTIC SEARCH)
-    // Metni alır, 768 boyutlu float dizisi döner.
+    // 6. METİN VEKTÖRLEŞTİRME (Semantic Search için)
     Task<float[]?> GetEmbeddingAsync(string text);
 }
 
@@ -41,7 +40,7 @@ public class PartalogAiService : IPartalogAiService
         _httpClient = httpClient;
         _logger = logger;
         
-        // Timeout ayarı (Uzun süren AI işlemleri için)
+        // Timeout ayarı (Uzun süren AI işlemleri için 5 dakika)
         _httpClient.Timeout = TimeSpan.FromMinutes(5);
 
         _jsonOptions = new JsonSerializerOptions
@@ -137,7 +136,7 @@ public class PartalogAiService : IPartalogAiService
         return new PageAnalysisResult { IsTechnicalDrawing = false, IsPartsList = false, Title = "Analiz Edilemedi" };
     }
 
-    // --- 4. EXPERT AI CHAT ---
+    // --- 4. EXPERT AI CHAT (GÜNCELLENMİŞ VERSİYON) ---
     public async Task<AiChatResponseDto> GetExpertChatResponseAsync(AiChatRequestDto request)
     {
         try
@@ -145,6 +144,7 @@ public class PartalogAiService : IPartalogAiService
             using var content = new MultipartFormDataContent();
 
             content.Add(new StringContent(request.Text ?? ""), "text");
+            // History null ise boş liste gönder
             var historyJson = JsonSerializer.Serialize(request.History ?? new List<ChatMessageDto>(), _jsonOptions);
             content.Add(new StringContent(historyJson), "history");
 
@@ -162,18 +162,20 @@ public class PartalogAiService : IPartalogAiService
             {
                 var errorMsg = await response.Content.ReadAsStringAsync();
                 _logger.LogError($"Chat API Hatası ({response.StatusCode}): {errorMsg}");
-                return new AiChatResponseDto { ReplySuggestion = "AI servisine ulaşılamıyor." };
+                // 🔥 HATA DURUMUNDA ANSWER DOLDURULUYOR
+                return new AiChatResponseDto { Answer = "AI servisine şu an ulaşılamıyor. Lütfen daha sonra tekrar deneyin." };
             }
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<AiChatResponseDto>(jsonResponse, _jsonOptions);
             
-            return result ?? new AiChatResponseDto { ReplySuggestion = "Anlaşılamadı." };
+            // 🔥 BOŞ DÖNERSE VARSAYILAN MESAJ
+            return result ?? new AiChatResponseDto { Answer = "Cevap anlaşılamadı." };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Chat servisi hatası.");
-            return new AiChatResponseDto { ReplySuggestion = "Sistem hatası oluştu." };
+            return new AiChatResponseDto { Answer = "Sistem hatası oluştu." };
         }
     }
 
@@ -194,14 +196,13 @@ public class PartalogAiService : IPartalogAiService
         }
     }
 
-    // --- 6. 🔥 YENİ: EMBEDDING (VEKTÖR) ALMA ---
+    // --- 6. EMBEDDING (VEKTÖR) ALMA ---
     public async Task<float[]?> GetEmbeddingAsync(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
 
         try
         {
-            // Python'a gidecek JSON: { "text": "civata" }
             var payload = new { text = text };
             var jsonContent = new StringContent(
                 JsonSerializer.Serialize(payload), 
@@ -268,7 +269,6 @@ public class PartalogAiService : IPartalogAiService
     }
     private class TableResultDto { public List<ProductItemDto>? Products { get; set; } }
 
-    // 🔥 Yeni: Embedding Cevabı için DTO
     private class EmbeddingResponseDto
     {
         [JsonPropertyName("embedding")]
@@ -276,7 +276,7 @@ public class PartalogAiService : IPartalogAiService
     }
 }
 
-// --- PUBLIC DTO'LAR ---
+// --- PUBLIC DTO'LAR (GÜNCELLENMİŞ YAPI) ---
 
 public class AiChatRequestDto
 {
@@ -291,25 +291,39 @@ public class ChatMessageDto
     public string Text { get; set; } = string.Empty;
 }
 
+// 🔥 Python'dan gelen JSON yapısına tam uygun DTO
 public class AiChatResponseDto
 {
-    [JsonPropertyName("search_term")]
-    public string? SearchTerm { get; set; }
+    // Python'dan gelen "answer" (Sohbet metni)
+    [JsonPropertyName("answer")]
+    public string? Answer { get; set; }
 
-    [JsonPropertyName("alternatives")]
-    public List<string>? Alternatives { get; set; }
+    // Python'dan gelen "sources" (Parça listesi)
+    [JsonPropertyName("sources")]
+    public List<ChatSourceDto>? Sources { get; set; }
 
-    [JsonPropertyName("gauge")]
-    public string? Gauge { get; set; }
+    // Debug amaçlı (Opsiyonel)
+    [JsonPropertyName("debug_intent")]
+    public object? DebugIntent { get; set; }
+}
 
-    [JsonPropertyName("strict_filter")]
-    public string? StrictFilter { get; set; }
+// Parça listesi içindeki her bir öğe
+public class ChatSourceDto
+{
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
 
-    [JsonPropertyName("negative_filter")]
-    public string? NegativeFilter { get; set; }
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
 
-    [JsonPropertyName("reply_suggestion")]
-    public string? ReplySuggestion { get; set; }
+    [JsonPropertyName("model")]
+    public string? Model { get; set; }
+
+    [JsonPropertyName("desc")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("similarity")]
+    public double Similarity { get; set; }
 }
 
 public class PageAnalysisResult
