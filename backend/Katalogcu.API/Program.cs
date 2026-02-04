@@ -7,7 +7,9 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Katalogcu.API.Services;
 using Microsoft.AspNetCore.Http.Features; 
-using Microsoft.AspNetCore.Server.Kestrel.Core; 
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Polly; // 🔥 Polly için
+using Polly.Extensions.Http; // 🔥 Polly HTTP Extensions için
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,12 +38,24 @@ builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<CatalogProcessorService>();
 
-// 🔥 AI SERVİS ENTEGRASYONU
+// 🔥 KUYRUK SİSTEMİ (BACKGROUND JOB) 🔥
+// 1. Kuyruğu Singleton yapıyoruz (Tüm uygulama aynı sırayı kullansın)
+builder.Services.AddSingleton<IBackgroundTaskQueue>(ctx => 
+{
+    return new BackgroundTaskQueue(100); // Kapasite: 100 Dosya
+});
+
+// 2. Arka Plan İşçisini (Worker) başlatıyoruz
+builder.Services.AddHostedService<QueuedHostedService>();
+
+
+// 🔥 AI SERVİS ENTEGRASYONU (POLLY İLE GÜÇLENDİRİLDİ) 🔥
 builder.Services.AddHttpClient<IPartalogAiService, PartalogAiService>(client =>
 {
     client.BaseAddress = new Uri("http://127.0.0.1:8000/"); 
-    client.Timeout = TimeSpan.FromMinutes(5); 
-});
+    client.Timeout = TimeSpan.FromMinutes(10); // Timeout süresini biraz artırdık
+})
+.AddPolicyHandler(GetRetryPolicy()); // 👈 Hata Telafisi Eklendi
 
 // Controller ve JSON Ayarları
 builder.Services.AddControllers().AddJsonOptions(options =>
@@ -53,9 +67,6 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), x => 
     {
-        // 🛠️ KRİTİK GÜNCELLEME: 
-        // Bu satır EF Core'a "Vector" tipini native olarak tanımasını söyler.
-        // Böylece "No suitable constructor found for type Vector" hatası çözülür.
         x.UseVector(); 
     }));
 
@@ -146,3 +157,19 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+
+// ========================================================
+// 🛠️ YARDIMCI METOTLAR (POLLY POLİTİKASI)
+// ========================================================
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+{
+    return HttpPolicyExtensions
+        // 1. Geçici Hataları Yakala (5xx, 408 Request Timeout)
+        .HandleTransientHttpError()
+        // 2. VEYA Google "Çok İstek Attın" (429 Too Many Requests) derse yakala
+        .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        // 3. Bekle ve Tekrar Dene (Exponential Backoff)
+        // İlk deneme: 2sn, İkinci: 4sn, Üçüncü: 8sn bekle.
+        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+}

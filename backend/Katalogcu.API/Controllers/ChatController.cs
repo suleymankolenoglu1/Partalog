@@ -1,9 +1,10 @@
-using Katalogcu.API.Services; // DTO'lar buradan gelecek
+using Katalogcu.API.Services;
 using Katalogcu.Domain.Entities;
 using Katalogcu.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json; 
+using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace Katalogcu.API.Controllers
 {
@@ -16,7 +17,7 @@ namespace Katalogcu.API.Controllers
         private readonly ILogger<ChatController> _logger;
 
         public ChatController(
-            IPartalogAiService aiService, 
+            IPartalogAiService aiService,
             AppDbContext context,
             ILogger<ChatController> logger)
         {
@@ -30,199 +31,254 @@ namespace Katalogcu.API.Controllers
         {
             try
             {
-                // 1. History JSON string olarak gelir, listeye çevirelim
-                // ChatMessageDto artık Services namespace'inden geliyor.
-                List<ChatMessageDto> chatHistory = new();
+                // 1. History Parse
+                var chatHistory = new List<ChatMessageDto>();
                 if (!string.IsNullOrEmpty(request.History))
                 {
-                    try {
+                    try
+                    {
                         chatHistory = JsonConvert.DeserializeObject<List<ChatMessageDto>>(request.History) ?? new();
-                    } catch { _logger.LogWarning("History parse edilemedi"); }
+                    }
+                    catch { _logger.LogWarning("History parse edilemedi, sohbet sıfırdan başlıyor."); }
                 }
 
-                // 2. Python Servisine İletmek İçin DTO Hazırla
-                // Bu AiChatRequestDto artık Services namespace'inden geliyor (Doğru olan)
-                var aiRequest = new AiChatRequestDto 
-                { 
+                // 2. Servis İsteği Hazırlığı
+                var aiRequest = new AiChatRequestDto
+                {
                     Text = request.Text,
                     Image = request.Image,
-                    History = chatHistory 
+                    History = chatHistory
                 };
 
-                var aiAnalysis = await _aiService.GetExpertChatResponseAsync(aiRequest);
+                // 3. AI Analizi (Python)
+                var aiResponse = await _aiService.GetExpertChatResponseAsync(aiRequest);
 
-                if (string.IsNullOrEmpty(aiAnalysis.SearchTerm))
+                // --- NİYET ANALİZİ ---
+                string? searchTerm = null;
+                if (aiResponse.DebugIntent is JsonElement intentElement)
                 {
-                    return Ok(new ChatResponseDto
-                    {
-                        ReplySuggestion = aiAnalysis.ReplySuggestion ?? "Anlaşıldı.",
-                        Products = [],
-                        DebugInfo = "Chat Mode (No Search)"
-                    });
+                    if (intentElement.TryGetProperty("search_term", out var st)) searchTerm = st.GetString();
                 }
 
-                // 3. STRATEJİK ARAMA MOTORU 🕵️‍♂️
-                (List<CatalogItem> results, string debugInfo) = await ExecuteSearchStrategyAsync(aiAnalysis);
+                // 4. PARÇA LİSTESİ HAZIRLIĞI
+                List<EnrichedPartResult> finalProducts = new();
 
-                // 4. SONUÇLARI ZENGİNLEŞTİR
-                var enrichedResults = await EnrichResultsAsync(results);
+                // SENARYO A: Python kaynak bulduysa
+                if (aiResponse.Sources != null && aiResponse.Sources.Any())
+                {
+                    finalProducts = await EnrichPythonSourcesAsync(aiResponse.Sources);
+                }
+                // SENARYO B: Python bulamadıysa ama Kod yakaladıysa
+                else if (!string.IsNullOrWhiteSpace(searchTerm) && IsPartNumber(searchTerm))
+                {
+                    var fallbackResults = await SearchByCodeAsync(searchTerm);
+                    finalProducts = await EnrichResultsAsync(fallbackResults);
+                }
 
-                // 5. RESPONSE HAZIRLA
-                string finalReply = !string.IsNullOrEmpty(aiAnalysis.ReplySuggestion)
-                    ? aiAnalysis.ReplySuggestion 
-                    : (results.Count > 0 ? $"İşte bulduğum sonuçlar ({results.Count} adet):" : "Üzgünüm, veritabanında eşleşen parça bulamadım.");
+                // 5. ACİL MÜDAHALE (Kod araması)
+                if (IsPartNumber(request.Text) && finalProducts.Count == 0)
+                {
+                    var directResults = await SearchByCodeAsync(request.Text);
+                    if (directResults.Any())
+                    {
+                        finalProducts = await EnrichResultsAsync(directResults);
+                        aiResponse.Answer = $"Aradığınız {request.Text} kodlu ürün için veritabanında {finalProducts.Count} sonuç buldum.";
+                    }
+                }
 
+                // 🔥 6. AI CEVABINI DÜZELTME (OVERRIDE - V2: ESTETİK AMELİYAT) 🔥
+                // AI "Unknown Part" derse, bütün cümleyi silmek yerine sadece o kelimeyi değiştiriyoruz.
+                // Böylece AI'nın yaptığı "Teknik Açıklama" (Description) kaybolmuyor.
+                if (!string.IsNullOrEmpty(aiResponse.Answer) && finalProducts.Any())
+                {
+                    var bestMatch = finalProducts.First();
+                    var bestName = bestMatch.Name;
+
+                    // AI'nın kullanabileceği "Bilinmiyor" ifadeleri
+                    var badPhrases = new[] { "Unknown Part", "Belirtilmemiş Parça", "İsimsiz Parça", "Bilinmeyen Parça", "İsimsiz" };
+                    bool correctionMade = false;
+
+                    foreach (var phrase in badPhrases)
+                    {
+                        if (aiResponse.Answer.Contains(phrase, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Kelimeyi bul ve DOĞRUSUYLA değiştir (Replace)
+                            aiResponse.Answer = aiResponse.Answer.Replace(phrase, bestName, StringComparison.OrdinalIgnoreCase);
+                            correctionMade = true;
+                        }
+                    }
+
+                    // Eğer düzeltme yaptıysak, parça kodunun cümlenin başında olduğundan emin olalım
+                    if (correctionMade && !aiResponse.Answer.Contains(bestMatch.Code))
+                    {
+                        aiResponse.Answer = $"{bestMatch.Code} - {aiResponse.Answer}";
+                    }
+
+                    // Eğer "Replace" işe yaramadıysa (cümle yapısı farklıysa) ama hala "Unknown" diyorsa, mecbur ezip geçiyoruz (Fallback)
+                    if (!correctionMade && (aiResponse.Answer.Contains("Unknown Part") || aiResponse.Answer.Contains("Belirtilmemiş")))
+                    {
+                        aiResponse.Answer = $"Aradığınız parça {bestMatch.Code} - {bestMatch.Name}, {bestMatch.Model ?? "ilgili"} makinesi içindir.";
+                    }
+                }
+
+                // 7. CEVAP DÖN
                 return Ok(new ChatResponseDto
                 {
-                    ReplySuggestion = finalReply,
-                    Products = enrichedResults,
-                    DebugInfo = debugInfo
+                    ReplySuggestion = aiResponse.Answer ?? "Üzgünüm, sonuç bulunamadı.",
+                    Products = finalProducts,
+                    DebugInfo = $"Search: {searchTerm ?? "Yok"}"
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Chat Ask endpoint'inde hata oluştu");
-                return StatusCode(500, new { error = "Bir hata oluştu, lütfen tekrar deneyin." });
+                _logger.LogError(ex, "Chat Controller Hatası");
+                return StatusCode(500, new { error = "Sistem hatası: " + ex.Message });
             }
         }
 
-        // --- ARAMA STRATEJİLERİ ---
-        private async Task<(List<CatalogItem> Results, string DebugInfo)> ExecuteSearchStrategyAsync(AiChatResponseDto aiData) 
+        // --- YARDIMCI METODLAR ---
+
+        private async Task<List<EnrichedPartResult>> EnrichPythonSourcesAsync(List<ChatSourceDto> sources)
         {
-            List<CatalogItem> results;
-            string debugInfo;
-            var mainTerm = aiData.SearchTerm ?? string.Empty;
+            var codes = sources.Where(s => !string.IsNullOrEmpty(s.Code)).Select(s => s.Code).Distinct().ToList();
+            if (!codes.Any()) return new();
 
-            // PLAN A
-            results = await SearchDatabaseAsync(mainTerm, aiData);
-            debugInfo = $"Plan A ({mainTerm} | Filters: {aiData.StrictFilter ?? "None"})";
-            if (results.Count > 0) return (results, debugInfo);
+            var products = await _context.Products.AsNoTracking().Where(p => codes.Contains(p.Code)).ToListAsync();
+            var productDict = products.GroupBy(p => p.Code).ToDictionary(g => g.Key, g => g.First());
 
-            // PLAN B
-            if (!string.IsNullOrEmpty(aiData.StrictFilter) || !string.IsNullOrEmpty(aiData.Gauge))
+            var catalogItems = await _context.CatalogItems.AsNoTracking().Where(ci => codes.Contains(ci.PartCode)).ToListAsync();
+
+            // 🔥 DUPLICATE ÇÖZÜCÜ (BEST RECORD SELECTION) 🔥
+            var itemDict = catalogItems
+                .GroupBy(ci => ci.PartCode)
+                .ToDictionary(g => g.Key, g => g
+                    .OrderByDescending(x => !string.IsNullOrWhiteSpace(x.PartName) && x.PartName != "Unknown Part")
+                    .ThenByDescending(x => !string.IsNullOrWhiteSpace(x.Description))
+                    .First());
+
+            var enrichedList = new List<EnrichedPartResult>();
+
+            foreach (var source in sources)
             {
-                // Service DTO'sunu kullanıyoruz
-                var relaxedData = new AiChatResponseDto 
-                { 
-                    SearchTerm = mainTerm,
-                    NegativeFilter = aiData.NegativeFilter, 
-                    Gauge = null, StrictFilter = null,
-                    ReplySuggestion = aiData.ReplySuggestion,
-                    Alternatives = aiData.Alternatives
-                };
-                results = await SearchDatabaseAsync(mainTerm, relaxedData);
-                debugInfo = $"Plan B ({mainTerm} - Relaxed)";
-                if (results.Count > 0) return (results, debugInfo);
-            }
+                if (string.IsNullOrEmpty(source.Code)) continue;
 
-            // PLAN C
-            if (aiData.Alternatives is { Count: > 0 })
-            {
-                foreach (var altTerm in aiData.Alternatives)
+                productDict.TryGetValue(source.Code, out var product);
+                itemDict.TryGetValue(source.Code, out var catItem);
+
+                string finalName = catItem?.PartName;
+                if (string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") finalName = source.Name;
+                if ((string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") && !string.IsNullOrWhiteSpace(catItem?.Description)) finalName = catItem.Description;
+                if (string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") finalName = $"Parça {source.Code}";
+
+                enrichedList.Add(new EnrichedPartResult
                 {
-                    results = await SearchDatabaseAsync(altTerm, aiData);
-                    if (results.Count > 0)
-                    {
-                        debugInfo = $"Plan C ({altTerm} + Filters)";
-                        return (results, debugInfo);
-                    }
-                }
+                    Id = catItem?.Id ?? Guid.Empty,
+                    Code = source.Code,
+                    Name = finalName,
+                    Description = catItem?.Description ?? source.Description,
+                    Model = source.Model,
+                    CatalogId = catItem?.CatalogId ?? Guid.Empty,
+                    PageNumber = catItem?.PageNumber,
+                    StockStatus = product != null ? "Stokta Var" : "Stokta Yok",
+                    Price = product?.Price,
+                    ImageUrl = product?.ImageUrl
+                });
             }
-
-            return (new List<CatalogItem>(), debugInfo);
+            return enrichedList;
         }
 
-        private async Task<List<CatalogItem>> SearchDatabaseAsync(string term, AiChatResponseDto filters)
+        private async Task<List<CatalogItem>> SearchByCodeAsync(string? term)
         {
             if (string.IsNullOrWhiteSpace(term)) return new List<CatalogItem>();
-            var normalizedTerm = term.ToUpperInvariant();
-
-            var query = _context.CatalogItems.AsNoTracking()
-                .Where(ci => EF.Functions.ILike(ci.PartName, $"%{normalizedTerm}%") || EF.Functions.ILike(ci.PartCode, $"%{normalizedTerm}%"));
-
-            if (!string.IsNullOrEmpty(filters.Gauge))
-            {
-                var gauge = filters.Gauge.ToUpperInvariant();
-                query = query.Where(ci => EF.Functions.ILike(ci.Description, $"%{gauge}%"));
-            }
-
-            if (!string.IsNullOrEmpty(filters.StrictFilter))
-            {
-                var strict = filters.StrictFilter.ToUpperInvariant();
-                query = query.Where(ci => EF.Functions.ILike(ci.Description, $"%{strict}%") || EF.Functions.ILike(ci.PartName, $"%{strict}%"));
-            }
-
-            if (!string.IsNullOrEmpty(filters.NegativeFilter))
-            {
-                var negative = filters.NegativeFilter.ToUpperInvariant();
-                query = query.Where(ci => !EF.Functions.ILike(ci.Description, $"%{negative}%") && !EF.Functions.ILike(ci.PartName, $"%{negative}%"));
-            }
-
-            var rawResults = await query.Take(50).ToListAsync();
-
-            return rawResults
-                .GroupBy(x => x.PartCode).Select(g => g.First())
-                .OrderByDescending(x => x.PartName.Equals(normalizedTerm, StringComparison.OrdinalIgnoreCase))
-                .ThenBy(x => x.PartName.Length)
-                .Take(10).ToList();
+            var code = term.Trim().ToUpperInvariant();
+            return await _context.CatalogItems
+                .Include(ci => ci.Catalog)
+                .AsNoTracking()
+                .Where(ci => ci.RefNumber == code || ci.PartCode == code || ci.PartCode.StartsWith(code))
+                .OrderBy(ci => ci.PartCode.Length)
+                .Take(5)
+                .ToListAsync();
         }
 
         private async Task<List<EnrichedPartResult>> EnrichResultsAsync(List<CatalogItem> items)
         {
-            if (items.Count == 0) return [];
+            if (items.Count == 0) return new();
+
             var codes = items.Select(i => i.PartCode).Distinct().ToList();
             var products = await _context.Products.AsNoTracking().Where(p => codes.Contains(p.Code)).ToListAsync();
             var productDict = products.GroupBy(p => p.Code).ToDictionary(g => g.Key, g => g.First());
 
+            var cleanCatalogItems = await _context.CatalogItems.AsNoTracking().Where(ci => codes.Contains(ci.PartCode)).ToListAsync();
+
+            // 🔥 BEST RECORD SELECTION 🔥
+            var bestItemsDict = cleanCatalogItems
+                .GroupBy(ci => ci.PartCode)
+                .ToDictionary(g => g.Key, g => g
+                    .OrderByDescending(x => !string.IsNullOrWhiteSpace(x.PartName) && x.PartName != "Unknown Part")
+                    .ThenByDescending(x => !string.IsNullOrWhiteSpace(x.Description))
+                    .First());
+
             return items.Select(item =>
             {
-                productDict.TryGetValue(item.PartCode, out var product);
+                productDict.TryGetValue(item.PartCode ?? "", out var product);
+                bestItemsDict.TryGetValue(item.PartCode ?? "", out var bestItem);
+                var targetItem = bestItem ?? item;
+
+                string displayName = targetItem.PartName;
+                if (string.IsNullOrWhiteSpace(displayName) || displayName == "Unknown Part")
+                {
+                    displayName = !string.IsNullOrWhiteSpace(targetItem.Description) ? targetItem.Description : $"Parça {targetItem.PartCode}";
+                }
+
                 return new EnrichedPartResult
                 {
-                    Id = item.Id, Code = item.PartCode, Name = item.PartName, Description = item.Description,
-                    CatalogId = item.CatalogId, PageNumber = item.PageNumber.ToString(),
+                    Id = targetItem.Id,
+                    Code = targetItem.PartCode ?? "",
+                    Name = displayName,
+                    Description = targetItem.Description,
+                    CatalogId = targetItem.CatalogId,
+                    PageNumber = targetItem.PageNumber,
                     StockStatus = product != null ? "Stokta Var" : "Stokta Yok",
-                    Price = product?.Price, ImageUrl = product?.ImageUrl
+                    Price = product?.Price,
+                    ImageUrl = product?.ImageUrl
                 };
             }).ToList();
         }
+
+        private bool IsPartNumber(string? term)
+        {
+            if (string.IsNullOrWhiteSpace(term)) return false;
+            return term.Length > 2 && term.Any(char.IsDigit);
+        }
     }
 
-    #region Controller-Specific DTOs
-
-    // ⚠️ DİKKAT: Burada 'AiChatRequestDto', 'ChatMessageDto' ve 'AiChatResponseDto' SINIFLARINI SİLDİK.
-    // Çünkü onlar zaten 'Katalogcu.API.Services' içinde var ve biz 'using' ile onları kullanıyoruz.
-    // Tekrar tanımlarsak çakışma (ambiguity) olur.
-
-    // 1. Controller'a gelen DTO (Frontend'den gelen - Özel DTO)
+    #region DTOs
     public class AiChatRequestWithHistoryDto
     {
         public string? Text { get; set; }
         public IFormFile? Image { get; set; }
-        public string? History { get; set; } // JSON String olarak gelir
+        public string? History { get; set; }
     }
 
-    // 2. Frontend'e dönen cevap (UI için - Özel DTO)
     public record ChatResponseDto
     {
         public string ReplySuggestion { get; init; } = string.Empty;
-        public List<EnrichedPartResult> Products { get; init; } = [];
+        public List<EnrichedPartResult> Products { get; init; } = new();
         public string? DebugInfo { get; init; }
     }
 
-    // 3. Zenginleştirilmiş Sonuç (UI için - Özel DTO)
     public record EnrichedPartResult
     {
-        public Guid Id { get; init; } 
+        public Guid Id { get; init; }
         public string Code { get; init; } = string.Empty;
         public string Name { get; init; } = string.Empty;
         public string? Description { get; init; }
+        public string? Model { get; init; }
         public Guid CatalogId { get; init; }
-        public string? PageNumber { get; init; } 
-        public string StockStatus { get; init; } = "Stokta Yok";
+        public string? PageNumber { get; init; }
+        public string StockStatus { get; init; } = "Bilinmiyor";
         public decimal? Price { get; init; }
         public string? ImageUrl { get; init; }
     }
-
     #endregion
 }

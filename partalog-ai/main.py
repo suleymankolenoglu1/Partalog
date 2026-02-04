@@ -1,6 +1,6 @@
 """
-Partalog AI Service - Ana Uygulama (Final v2.2 - Semantic Search Added)
-YOLO Hotspot + OCR + Gemini Analysis + AI Chat + Embeddings
+Partalog AI Service - Ana Uygulama (Final v2.3 - Modular Architecture)
+YOLO Hotspot + OCR + Gemini Analysis + AI Chat + Embeddings (Centralized)
 """
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
@@ -12,13 +12,13 @@ from pydantic import BaseModel
 import sys
 import os
 import uvicorn
-import importlib
-import requests  # REST API isteği için eklendi
 
 # Kendi modüllerimiz
 from config import settings
 from core.ai_engine import GeminiTableExtractor
 from core.dependencies import set_ai_engine 
+# 👇 YENİ: Embedding servisini buradan çağırıyoruz
+from services.embedding import get_text_embedding
 
 # --- ROUTER IMPORTLARI ---
 from api.hotspot import router as hotspot_router
@@ -135,49 +135,23 @@ app.include_router(hotspot_router, prefix="/api/hotspot", tags=["Hotspot Detecti
 app.include_router(table_router, prefix="/api/table", tags=["Table Extraction"])
 app.include_router(chat_router, prefix="/api/chat", tags=["AI Chat"]) 
 
-# --- 🔥 YENİ: EMBEDDING ENDPOINT (REST API) ---
+# --- 🔥 GÜNCELLENDİ: EMBEDDING ENDPOINT (Modüler Yapı) ---
 class EmbeddingRequest(BaseModel):
     text: str
 
 @app.post("/api/embed", tags=["Semantic Search"])
 async def generate_embedding(req: EmbeddingRequest):
     """
-    Metni 768 boyutlu vektöre çevirir (Google Gemini text-embedding-004).
+    Metni 768 boyutlu vektöre çevirir.
+    Artık 'services/embedding.py' modülünü kullanıyor.
     """
-    # API Key'i config'den alıyoruz. 
-    # Config dosyanızda GEMINI_API_KEY olduğundan emin olun.
-    api_key = getattr(settings, "GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+    # Tek satırda işlem bitiyor!
+    vector = get_text_embedding(req.text)
     
-    if not api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY ayarlanmamış!")
+    if not vector:
+        raise HTTPException(status_code=500, detail="Vektör oluşturulamadı (Google API Hatası).")
 
-    model_name = "models/text-embedding-004"
-    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={api_key}"
-    
-    payload = {
-        "model": model_name,
-        "content": {"parts": [{"text": req.text}]}
-    }
-    
-    try:
-        # Doğrudan REST isteği (Kütüphane bağımsız)
-        response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-        
-        if response.status_code != 200:
-            logger.error(f"Gemini API Hatası: {response.text}")
-            raise HTTPException(status_code=response.status_code, detail=f"Gemini Error: {response.text}")
-
-        data = response.json()
-        vector = data.get("embedding", {}).get("values")
-        
-        if not vector:
-             raise HTTPException(status_code=500, detail="Vektör alınamadı (Boş yanıt).")
-
-        return {"embedding": vector}
-
-    except Exception as e:
-        logger.error(f"Embedding Hatası: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"embedding": vector}
 
 
 # --- ADMIN EĞİTİM ENDPOINT'İ ---
@@ -211,7 +185,7 @@ async def health():
             "yolo_detector": models.get("yolo") is not None,
             "easyocr": models.get("ocr") is not None,
             "table_engine": models.get("table_reader") is not None,
-            "embedding_service": "Active (REST API)",
+            "embedding_service": "Active (Modular)",
             "dictionary_loaded": dict_exists
         }
     }
