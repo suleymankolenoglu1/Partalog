@@ -1,0 +1,78 @@
+<div class="flex flex-col gap-6 bg-[#F9F8F6] p-6 min-h-screen text-blue-900 font-sans">
+    
+    <div class="max-w-2xl mx-auto w-full">
+        
+        <div class="flex items-center gap-4 mb-8">
+            <a routerLink="/dashboard/parts" class="p-2 rounded-full hover:bg-blue-100 text-blue-600 transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-blue-950">Toplu Parça Yükle</h1>
+                <p class="text-blue-700/70">Excel dosyanızdaki ürünleri hızlıca içeri aktarın.</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-xl shadow-sm border border-blue-100">
+            
+            <div class="mb-6">
+                <label class="block text-sm font-bold text-blue-950 mb-2">Hangi Kataloğa Eklenecek?</label>
+                <div class="relative">
+                    <select [(ngModel)]="selectedCatalogId" class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all cursor-pointer appearance-none">
+                        <option value="" disabled selected>Bir katalog seçin</option>
+                        @for (cat of catalogs; track cat.id) {
+                            <option [value]="cat.id">{{ cat.name }}</option>
+                        }
+                    </select>
+                    <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none">expand_more</span>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <label class="block text-sm font-bold text-blue-950 mb-2">Excel Dosyası (.xlsx)</label>
+                
+                <label class="cursor-pointer bg-white border-2 border-dashed border-blue-200 hover:border-green-500 hover:bg-green-50 transition-all rounded-lg p-10 w-full text-center group flex flex-col items-center justify-center gap-3">
+                    <input type="file" (change)="onFileSelected($event)" accept=".xlsx" class="hidden">
+                    
+                    @if (!selectedFile) {
+                        <span class="material-symbols-outlined text-5xl text-blue-300 group-hover:text-green-500 transition-colors">table_view</span>
+                        <div class="text-center">
+                            <span class="text-sm font-bold text-blue-900 group-hover:text-green-700 transition-colors">Dosya seçmek için tıklayın</span>
+                            <p class="text-xs text-blue-400 mt-1">Desteklenen format: .xlsx</p>
+                        </div>
+                    } @else {
+                        <span class="material-symbols-outlined text-5xl text-green-500 animate-bounce">description</span>
+                        <span class="text-lg font-bold text-green-700">{{ selectedFile.name }}</span>
+                        <span class="text-xs text-green-600 font-medium bg-green-100 px-2 py-1 rounded-full">Dosya yüklenecek</span>
+                    }
+                </label>
+            </div>
+
+            <div class="mb-8 p-4 bg-blue-50 border border-blue-100 text-blue-800 text-sm rounded-lg flex gap-3 items-start">
+                <span class="material-symbols-outlined text-xl shrink-0 text-blue-600">info</span>
+                <div>
+                    <p class="font-bold mb-1 text-blue-900">Excel Formatı Nasıl Olmalı?</p>
+                    <p>Sütun sırası: <strong class="text-blue-950">Ad | Kod | Kategori | Fiyat | Stok | Açıklama</strong></p>
+                    <p class="mt-1 text-blue-500 text-xs">İlk satır başlık olarak kabul edilir ve atlanır.</p>
+                </div>
+            </div>
+
+            <div class="flex gap-4 pt-4 border-t border-blue-100">
+                <button routerLink="/dashboard/parts" class="flex-1 h-12 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold transition-colors">
+                    İptal
+                </button>
+                
+                <button (click)="onUpload()" [disabled]="isUploading || !selectedCatalogId || !selectedFile" 
+                        class="flex-[2] h-12 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-green-600/20">
+                    @if (isUploading) {
+                        <span class="material-symbols-outlined animate-spin">sync</span>
+                        İçeri Aktarılıyor...
+                    } @else {
+                        <span class="material-symbols-outlined">upload</span>
+                        Yüklemeyi Başlat
+                    }
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>

@@ -1,0 +1,99 @@
+<div class="app-layout">
+    
+    <aside class="app-sidebar">
+        
+        <div class="sidebar-header">
+            <div class="logo-icon">
+                <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path clip-rule="evenodd" d="M47.2426 24L24 47.2426L0.757355 24L24 0.757355L47.2426 24ZM12.2426 21H35.7574L24 9.24264L12.2426 21Z" fill-rule="evenodd"></path>
+                </svg>
+            </div>
+            <span class="app-name">Partalog Panel</span>
+        </div>
+
+        <nav class="sidebar-nav">
+            
+            <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-item">
+                <span class="material-symbols-outlined icon">dashboard</span>
+                <span class="label">Genel Bakış</span>
+            </a>
+
+            <a routerLink="/dashboard/catalogs" routerLinkActive="active" class="nav-item">
+                <span class="material-symbols-outlined icon">menu_book</span>
+                <span class="label">Kataloglarım</span>
+            </a>
+
+             <a routerLink="/dashboard/parts" routerLinkActive="active" class="nav-item">
+                <span class="material-symbols-outlined icon">settings_suggest</span>
+                <span class="label">Parça Yönetimi</span>
+            </a>
+
+            <a routerLink="/dashboard/customers" routerLinkActive="active" class="nav-item">
+                <span class="material-symbols-outlined icon">group</span>
+                <span class="label">Müşteriler</span>
+            </a>
+
+            <div class="nav-divider"></div>
+
+            <a routerLink="/dashboard/settings" routerLinkActive="active" class="nav-item">
+                <span class="material-symbols-outlined icon">settings</span>
+                <span class="label">Ayarlar</span>
+            </a>
+
+            <div class="store-card-wrapper">
+                <a routerLink="/public-view" target="_blank" class="store-card">
+                    <div class="store-icon-box">
+                        <span class="material-symbols-outlined store-icon">storefront</span>
+                    </div>
+                    <div class="store-info">
+                        <span class="store-title">Mağaza Vitrini</span>
+                        <span class="store-subtitle">Müşteri Görünümü</span>
+                    </div>
+                    <span class="material-symbols-outlined arrow-icon">open_in_new</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="logout-btn" (click)="logout()">
+                <span class="material-symbols-outlined icon">logout</span>
+                <span class="label">Çıkış Yap</span>
+            </button>
+        </div>
+    </aside>
+
+    <div class="main-content-wrapper">
+        
+        <header class="app-header">
+            <div class="header-left">
+                <button class="mobile-menu-btn">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+                
+                <div class="search-box">
+                    <span class="material-symbols-outlined search-icon">search</span>
+                    <input type="text" placeholder="Katalog veya parça ara..." class="search-input">
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button class="notif-btn">
+                    <span class="material-symbols-outlined">notifications</span>
+                    <span class="notif-dot"></span>
+                </button>
+                
+                <div class="user-profile">
+                    <div class="user-info">
+                        <p class="user-name">Ahmet Yılmaz</p>
+                        <p class="user-role">Firma Sahibi</p>
+                    </div>
+                    <img src="https://ui-avatars.com/api/?name=Ahmet+Yilmaz&background=random" class="user-avatar">
+                </div>
+            </div>
+        </header>
+
+        <main class="page-container">
+            <router-outlet></router-outlet>
+        </main>
+    </div>
+</div>

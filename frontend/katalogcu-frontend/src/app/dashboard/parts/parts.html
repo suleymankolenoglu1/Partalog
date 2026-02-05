@@ -1,0 +1,191 @@
+<div class="apple-page-wrapper">
+    
+    <header class="page-header">
+        <div class="header-content">
+            <h1>Parça Envanteri</h1>
+            <p>Stok takibi, fiyatlandırma ve katalog eşleşmeleri.</p>
+        </div>
+        
+        <div class="header-actions">
+            <button routerLink="/dashboard/parts/import" class="btn-secondary">
+                <span class="material-symbols-outlined icon success-icon">upload_file</span>
+                Excel Yükle
+            </button>
+
+            <button routerLink="/dashboard/parts/new" class="btn-primary">
+                <span class="material-symbols-outlined icon">add</span>
+                Yeni Parça
+            </button>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="search-wrapper">
+            <span class="material-symbols-outlined search-icon">search</span>
+            <input type="text" 
+                   [ngModel]="searchQuery"
+                   (ngModelChange)="onSearch($event)"
+                   placeholder="Kod, Parça Adı veya OEM Ara..." 
+                   class="search-input">
+        </div>
+
+        <div class="filter-group">
+            
+            <select class="filter-select" 
+                    [ngModel]="selectedCatalogId" 
+                    (ngModelChange)="onCatalogFilterChange($event)">
+                
+                <option value="">Tüm Kataloglar</option>
+                <option value="general">Genel Stok (Katalogsuz)</option>
+                
+                @for (cat of catalogs; track cat.id) {
+                    <option [value]="cat.id">{{ cat.name }}</option>
+                }
+            </select>
+            
+            <select class="filter-select"
+                    [ngModel]="selectedStockStatus" 
+                    (ngModelChange)="onStockFilterChange($event)">
+                <option value="">Tüm Stok Durumları</option>
+                <option value="low">Kritik Seviye (< 10)</option>
+                <option value="out">Tükendi</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="w-checkbox"><input type="checkbox" class="apple-checkbox"></th>
+                        <th class="w-img">GÖRSEL</th>
+                        <th class="col-main">PARÇA BİLGİSİ</th> 
+                        <th>KATALOG</th> 
+                        <th>FİYAT</th>
+                        <th>STOK</th> 
+                        <th class="text-right">İŞLEM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    @if (isLoading) {
+                        <tr>
+                            <td colspan="7" class="loading-cell">
+                                <div class="spinner-inline"></div> Veriler yükleniyor...
+                            </td>
+                        </tr>
+                    }
+
+                    @if (filteredParts.length === 0 && !isLoading) {
+                        <tr>
+                            <td colspan="7" class="empty-cell">
+                                <div class="empty-state">
+                                    <span class="material-symbols-outlined icon">inventory_2</span>
+                                    <p>Kayıtlı parça bulunamadı veya filtreye uyan sonuç yok.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+
+                    @for (part of paginatedParts; track part.id) {
+                        <tr class="data-row">
+                            <td><input type="checkbox" class="apple-checkbox"></td>
+                            
+                            <td>
+                                <div class="part-thumbnail">
+                                    <img [src]="part.imageUrl || 'assets/placeholder.png'" 
+                                         class="thumb-img" 
+                                         onerror="this.src='https://placehold.co/48x48?text=No+Img'"> 
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="part-info-container">
+                                    <div class="info-top">
+                                        <span class="code-badge">{{ part.code }}</span>
+                                        @if(part.oemNo) {
+                                            <span class="oem-pill">{{ part.oemNo }}</span>
+                                        }
+                                    </div>
+                                    <div class="part-name-text" [title]="part.name">
+                                        {{ part.name }}
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                @if (part.catalogName) {
+                                    <div class="catalog-tag">
+                                        <span class="material-symbols-outlined icon-tiny">folder_open</span>
+                                        {{ part.catalogName }}
+                                    </div>
+                                } @else {
+                                    <span class="text-muted text-xs">-</span>
+                                }
+                            </td>
+
+                            <td class="price-text font-mono">
+                                {{ part.price | currency:'TRY':'symbol-narrow':'1.2-2' }}
+                            </td>
+                            
+                            <td>
+                                <div class="stock-wrapper">
+                                    <span class="stock-qty" [class.text-red]="part.stockQuantity === 0">
+                                        {{ part.stockQuantity }} Adet
+                                    </span>
+                                    <div class="stock-progress">
+                                        <div class="progress-bar" 
+                                             [style.width.%]="getStockPercentage(part.stockQuantity)"
+                                             [ngClass]="getStockColorClass(part.stockQuantity)">
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <td class="text-right">
+                                <div class="row-actions">
+                                    <button class="icon-btn edit" title="Düzenle">
+                                        <span class="material-symbols-outlined">edit_square</span>
+                                    </button>
+                                    <button class="icon-btn delete" title="Sil" (click)="deletePart(part)">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination-bar">
+            <span class="pagination-info">
+                Toplam {{ filteredParts.length }} kayıttan 
+                {{ filteredParts.length > 0 ? (currentPage - 1) * pageSize + 1 : 0 }} - 
+                {{ currentPage * pageSize > filteredParts.length ? filteredParts.length : currentPage * pageSize }} 
+                arası gösteriliyor
+            </span>
+            
+            <div class="pagination-controls">
+                <button class="page-btn" 
+                        [disabled]="currentPage === 1"
+                        (click)="changePage(currentPage - 1)">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                </button>
+
+                <button class="page-btn active">{{ currentPage }}</button>
+                
+                @if(totalPages > 1) {
+                    <span class="text-muted" style="font-size: 12px; padding: 0 4px;">/ {{ totalPages }}</span>
+                }
+
+                <button class="page-btn" 
+                        [disabled]="currentPage === totalPages || totalPages === 0"
+                        (click)="changePage(currentPage + 1)">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

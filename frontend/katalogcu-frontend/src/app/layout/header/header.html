@@ -1,0 +1,37 @@
+<header class="sticky top-0 z-50 flex w-full justify-center border-b border-border-light/80 bg-background-light/80 dark:border-border-dark/80 dark:bg-background-dark/80 backdrop-blur-sm">
+    <div class="flex w-full max-w-6xl items-center justify-between px-6 py-4">
+        
+        <a  class="flex items-center gap-4 text-text-dark dark:text-text-light cursor-pointer hover:opacity-80 transition-opacity select-none">
+            <div class="size-6 text-primary">
+                <svg fill="currentColor" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <g clip-path="url(#clip0_6_535)">
+                        <path clip-rule="evenodd" d="M47.2426 24L24 47.2426L0.757355 24L24 0.757355L47.2426 24ZM12.2426 21H35.7574L24 9.24264L12.2426 21Z" fill-rule="evenodd"></path>
+                    </g>
+                    <defs>
+                        <clippath id="clip0_6_535">
+                            <rect fill="white" height="48" width="48"></rect>
+                        </clippath>
+                    </defs>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold leading-tight tracking-[-0.015em]">Katalogcu</h2>
+        </a>
+
+        <div class="hidden items-center gap-8 md:flex">
+            <a routerLink="/explore" class="text-sm font-medium text-text-muted-light hover:text-text-dark dark:text-text-muted-dark dark:hover:text-text-light cursor-pointer">Keşfet</a>
+            
+            <a routerLink="/blog" class="text-sm font-medium text-text-muted-light hover:text-text-dark dark:text-text-muted-dark dark:hover:text-text-light cursor-pointer">Blog</a>
+            <a routerLink="/servisler" class="text-sm font-medium text-text-muted-light hover:text-text-dark dark:text-text-muted-dark dark:hover:text-text-light cursor-pointer">Servisler</a>
+            <a routerLink="/prices" class="text-sm font-medium text-text-muted-light hover:text-text-dark dark:text-text-muted-dark dark:hover:text-text-light cursor-pointer">Ücretlendirme</a>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <button routerLink ="/login" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-5 bg-primary text-background-dark text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity">
+                <span class="truncate">Giriş/Kayıt Ol</span>
+            </button>
+            <button class="md:hidden p-2 rounded-md text-text-dark dark:text-text-light">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+        </div>
+    </div>
+</header>

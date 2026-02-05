@@ -1,9 +1,10 @@
 """
-Partalog AI Service - Ana Uygulama (Final v2.3 - Modular Architecture)
-YOLO Hotspot + OCR + Gemini Analysis + AI Chat + Embeddings (Centralized)
+Partalog AI Service - Ana Uygulama (Final v2.4 - Service Mode)
+Görevi: C# Backend için Zeka Servislerini (YOLO, OCR, Gemini, Embedding) sunmak.
 """
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+# --- 1. Standart Kütüphaneler ---
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -12,28 +13,30 @@ from pydantic import BaseModel
 import sys
 import os
 import uvicorn
+import time
 
-# Kendi modüllerimiz
+# --- 2. Ayarlar ---
 from config import settings
+
+# --- 3. Çekirdek Yapay Zeka Modülleri ---
 from core.ai_engine import GeminiTableExtractor
 from core.dependencies import set_ai_engine 
-# 👇 YENİ: Embedding servisini buradan çağırıyoruz
-from services.embedding import get_text_embedding
+from services.embedding import get_text_embedding # 🧠 C# için Vektör Servisi
 
-# --- ROUTER IMPORTLARI ---
-from api.hotspot import router as hotspot_router
-from api.table import router as table_router
-from api.analysis import router as analysis_router
-from api.chat import router as chat_router 
+# --- 4. API Routerları (Uç Noktalar) ---
+from api.hotspot import router as hotspot_router  # YOLO & OCR
+from api.table import router as table_router      # Gemini Tablo Okuma
+from api.analysis import router as analysis_router # Sayfa Sınıflandırma
+from api.chat import router as chat_router        # Chatbot (Veritabanı Okur)
 
-# --- EĞİTİM MODÜLÜ (Opsiyonel import) ---
+# --- 5. Eğitim Modülü (Hata Önleyici ile) ---
 try:
     import train_dictionary
 except ImportError:
-    logger.warning("⚠️ 'train_dictionary.py' bulunamadı. Admin eğitim endpoint'i çalışmayabilir.")
+    logger.warning("⚠️ 'train_dictionary.py' bulunamadı veya hatalı. Eğitim çalışmayabilir.")
     train_dictionary = None
 
-# Logging Ayarları
+# --- 6. Gelişmiş Loglama Ayarı ---
 logger.remove()
 logger.add(
     sys.stdout,
@@ -42,153 +45,141 @@ logger.add(
     colorize=True
 )
 
-# Global Model Deposu
+# --- 7. Model Başlatma (Lifespan) ---
+# Uygulama açılırken modelleri yükler, kapanırken temizler.
 models = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
-    logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} başlatılıyor...")
+    logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} (Service Mode) BAŞLATILIYOR...")
     logger.info("=" * 60)
     
-    # 0. SÖZLÜK KONTROLÜ
-    dict_path = "sanayi_sozlugu.json"
-    if os.path.exists(dict_path):
-        import json
-        try:
-            with open(dict_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            logger.success(f"🧠 Sanayi Hafızası Yüklü: {len(data)} terim biliniyor.")
-        except:
-            logger.error("❌ Sanayi sözlüğü dosyası bozuk.")
+    # A. Sözlük Kontrolü
+    if os.path.exists("sanayi_sozlugu.json"):
+        logger.success("🧠 Sanayi Hafızası (Sözlük) yüklü.")
     else:
-        logger.warning("⚠️ Sanayi sözlüğü bulunamadı. '/api/admin/train' ile eğitimi başlatın.")
+        logger.warning("⚠️ Sanayi sözlüğü henüz yok. C# ilk kataloğu yükleyince oluşacak.")
 
-    # 1. YOLO Detector Yükle
+    # B. YOLO Hotspot Detector Yükle
     if os.path.exists(settings.YOLO_MODEL_PATH):
         try:
             from core.detector import HotspotDetector
             models["yolo"] = HotspotDetector(
-                model_path=settings.YOLO_MODEL_PATH,
-                confidence=settings.YOLO_CONFIDENCE,
-                img_size=settings.YOLO_IMG_SIZE
+                settings.YOLO_MODEL_PATH, 
+                settings.YOLO_CONFIDENCE, 
+                settings.YOLO_IMG_SIZE
             )
-            logger.success(f"✅ YOLO Detector yüklendi: {settings.YOLO_MODEL_PATH}")
+            logger.success(f"✅ YOLO Modeli Yüklendi: {settings.YOLO_MODEL_PATH}")
         except Exception as e:
-            logger.error(f"❌ YOLO Hatası: {e}")
-            models["yolo"] = None
+            logger.error(f"❌ YOLO Başlatılamadı: {e}")
     else:
-        logger.warning(f"⚠️ YOLO modeli bulunamadı: {settings.YOLO_MODEL_PATH}")
-        models["yolo"] = None
+        logger.warning(f"⚠️ Model dosyası yok: {settings.YOLO_MODEL_PATH}")
     
-    # 2. EasyOCR Reader Yükle
+    # C. EasyOCR Yükle
     try:
         from core.ocr import HotspotOCR
         models["ocr"] = HotspotOCR(use_gpu=settings.OCR_USE_GPU)
-        logger.success("✅ EasyOCR Reader yüklendi")
+        logger.success("✅ EasyOCR Motoru Hazır.")
     except Exception as e:
-        logger.error(f"❌ EasyOCR Başlatılamadı: {e}")
-        models["ocr"] = None
+        logger.error(f"❌ EasyOCR Hatası: {e}")
     
-    # 3. Gemini Table Engine
+    # D. Gemini Motorunu Hazırla
     try:
         gemini_engine = GeminiTableExtractor()
         set_ai_engine(gemini_engine) 
-        models["table_reader"] = gemini_engine
-        logger.success("✅ Gemini Tablo Motoru yüklendi")
+        logger.success("✅ Gemini AI Motoru Bağlandı.")
     except Exception as e:
-        logger.critical(f"❌ Gemini Tablo Motoru Başlatılamadı: {e}")
+        logger.critical(f"❌ Gemini Bağlantı Hatası: {e}")
     
-    logger.info("=" * 60)
-    logger.info("🎯 Servis hazır ve çalışıyor!")
-    logger.info(f"📍 API Docs: http://localhost:{settings.PORT}/docs")
-    logger.info("=" * 60)
-    
+    logger.info(f"📍 Servis Yayında: http://{settings.HOST}:{settings.PORT}")
     yield
-    
-    logger.info("👋 Servis kapatılıyor...")
+    # Kapanış
+    logger.info("👋 Servis durduruluyor, modeller temizleniyor...")
     models.clear()
 
-# FastAPI App Tanımlama
+# --- 8. Uygulama Tanımı ---
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Partalog AI - Complete Suite (Detection + OCR + Analysis + Chat + Embeddings)",
+    description="C# Backend için Yardımcı Zeka Servisi",
     lifespan=lifespan
 )
 
-# CORS
+# --- 9. CORS (Güvenlik İzinleri) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Geliştirme ortamı için herkese izin ver
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- 10. Statik Dosyalar ---
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- API ROUTER BAĞLANTILARI ---
-app.include_router(analysis_router, prefix="/api/analysis", tags=["Page Analysis"])
-app.include_router(hotspot_router, prefix="/api/hotspot", tags=["Hotspot Detection"])
-app.include_router(table_router, prefix="/api/table", tags=["Table Extraction"])
-app.include_router(chat_router, prefix="/api/chat", tags=["AI Chat"]) 
+# --- 11. Router Bağlantıları ---
+app.include_router(analysis_router, prefix="/api/analysis", tags=["1. Analiz"])
+app.include_router(hotspot_router, prefix="/api/hotspot", tags=["2. Hotspot (YOLO)"])
+app.include_router(table_router, prefix="/api/table", tags=["3. Tablo (Gemini)"])
+app.include_router(chat_router, prefix="/api/chat", tags=["4. Chatbot"])
 
-# --- 🔥 GÜNCELLENDİ: EMBEDDING ENDPOINT (Modüler Yapı) ---
+# =================================================================
+# 👇 KRİTİK ENDPOINTLER (C# BURALARLA KONUŞACAK)
+# =================================================================
+
+# Model: Embedding İsteği
 class EmbeddingRequest(BaseModel):
     text: str
 
-@app.post("/api/embed", tags=["Semantic Search"])
+@app.post("/api/embed", tags=["5. Semantic Search (C# Helper)"])
 async def generate_embedding(req: EmbeddingRequest):
     """
-    Metni 768 boyutlu vektöre çevirir.
-    Artık 'services/embedding.py' modülünü kullanıyor.
+    C# Backend bu endpoint'e metin gönderir (örn: "Solenoid Valf").
+    Python, Google API'yi kullanarak bunu 768 boyutlu vektöre çevirir.
     """
-    # Tek satırda işlem bitiyor!
+    start = time.time()
+    if not req.text or len(req.text.strip()) < 2:
+         raise HTTPException(status_code=400, detail="Metin çok kısa veya boş.")
+
+    # Servis dosyasını çağır
     vector = get_text_embedding(req.text)
     
     if not vector:
-        raise HTTPException(status_code=500, detail="Vektör oluşturulamadı (Google API Hatası).")
+        raise HTTPException(status_code=500, detail="Google API'den vektör alınamadı.")
 
+    process_time = round((time.time() - start) * 1000, 2)
+    logger.info(f"🧠 Vektör oluşturuldu ({process_time}ms): {req.text[:30]}...")
+    
     return {"embedding": vector}
 
 
-# --- ADMIN EĞİTİM ENDPOINT'İ ---
-@app.post("/api/admin/train", tags=["Admin & Training"])
+@app.post("/api/admin/train", tags=["6. Admin & Training"])
 async def trigger_training(background_tasks: BackgroundTasks):
+    """
+    C# veritabanına kaydı bitirince burayı tetikler.
+    Bu kod arka planda 'train_dictionary.py' dosyasını çalıştırır.
+    """
     if train_dictionary:
+        # Arka planda çalıştır (Fire-and-Forget)
         background_tasks.add_task(train_dictionary.main)
-        return {
-            "status": "started", 
-            "message": "Eğitim arka planda başlatıldı."
-        }
+        logger.info("🚂 C#'tan eğitim emri geldi. Eğitim başlatılıyor...")
+        return {"status": "started", "message": "Sözlük eğitimi başlatıldı."}
     else:
-        return {"status": "error", "message": "train_dictionary.py modülü bulunamadı."}
+        logger.error("❌ Eğitim modülü yüklenemediği için işlem yapılamadı.")
+        raise HTTPException(status_code=503, detail="Eğitim modülü (train_dictionary) bulunamadı.")
 
+# =================================================================
 
 @app.get("/", tags=["Health"])
 async def root():
     return {
         "service": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "features": ["YOLO", "EasyOCR", "Gemini Tables", "Embeddings", "Expert Chat"],
-        "docs": "/docs"
+        "mode": "Service Mode (Connected to C#)",
+        "status": "Active"
     }
 
-@app.get("/health", tags=["Health"])
-async def health():
-    dict_exists = os.path.exists("sanayi_sozlugu.json")
-    return {
-        "status": "healthy",
-        "models": {
-            "yolo_detector": models.get("yolo") is not None,
-            "easyocr": models.get("ocr") is not None,
-            "table_engine": models.get("table_reader") is not None,
-            "embedding_service": "Active (Modular)",
-            "dictionary_loaded": dict_exists
-        }
-    }
-
+# Doğrudan çalıştırma desteği
 if __name__ == "__main__":
     uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)

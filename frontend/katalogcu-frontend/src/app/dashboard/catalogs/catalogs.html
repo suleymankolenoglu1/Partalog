@@ -1,0 +1,159 @@
+<div class="apple-page-wrapper">
+    
+    <header class="page-header">
+        <div class="header-content">
+            <h1>Kataloglarım</h1>
+            <p>Teknik dökümanları klasörleyerek organize edin.</p>
+        </div>
+        
+        <div class="header-actions">
+            <button (click)="createFolder()" class="btn-secondary">
+                <span class="material-symbols-outlined icon">create_new_folder</span>
+                Yeni Klasör
+            </button>
+
+            <button [routerLink]="['/dashboard/catalogs/new']" 
+                    [queryParams]="{ folderId: currentFolderId }"
+                    class="btn-primary">
+                <span class="material-symbols-outlined icon">upload_file</span>
+                Katalog Yükle
+            </button>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <nav class="breadcrumbs">
+            @for (crumb of breadcrumbs; track crumb.id; let last = $last; let i = $index) {
+                <div class="crumb-item" [class.active]="last">
+                    <button (click)="navigateToBreadcrumb(i)" [disabled]="last">
+                        @if(i === 0) { <span class="material-symbols-outlined home-icon">home</span> }
+                        <span class="crumb-text">{{ crumb.name }}</span>
+                    </button>
+                    @if (!last) {
+                        <span class="material-symbols-outlined separator">chevron_right</span>
+                    }
+                </div>
+            }
+        </nav>
+
+        <div class="search-wrapper">
+            <span class="material-symbols-outlined search-icon">search</span>
+            <input type="text" placeholder="Bu klasörde ara..." class="search-input">
+        </div>
+    </div>
+
+    @if (isLoading) {
+        <div class="loading-state">
+            <span class="material-symbols-outlined spinner">sync</span>
+            <p>İçerik yükleniyor...</p>
+        </div>
+    } 
+    
+    @else if (visibleFolders.length === 0 && visibleCatalogs.length === 0) {
+        <div class="empty-state">
+            <div class="empty-icon">
+                <span class="material-symbols-outlined">folder_open</span>
+            </div>
+            <h3>Bu Klasör Boş</h3>
+            <p>Buraya yeni bir katalog yükleyebilir veya alt klasör oluşturabilirsiniz.</p>
+        </div>
+    }
+    
+    @else {
+        <div class="content-grid">
+            
+            @for (folder of visibleFolders; track folder.id) {
+                <div (click)="enterFolder(folder)"
+                     (dragover)="onDragOver($event)"
+                     (drop)="onDrop($event, folder)" 
+                     class="folder-card group"> <div class="folder-icon-box">
+                        <span class="material-symbols-outlined folder-icon">folder</span>
+                    </div>
+
+                    <div class="folder-info">
+                        <span class="folder-name">{{ folder.name }}</span>
+                        <span class="folder-count">{{ folder.itemCount }} öğe</span>
+                    </div>
+
+                    <div class="folder-actions">
+                        <button (click)="deleteFolder(folder, $event)" 
+                                class="folder-delete-btn" 
+                                title="Klasörü Sil">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                        
+                        <span class="material-symbols-outlined arrow-icon">chevron_right</span>
+                    </div>
+                </div>
+            }
+
+            @for (item of visibleCatalogs; track item.id) {
+                <div draggable="true"
+                     (dragstart)="onDragStart($event, item.id)"
+                     class="catalog-card">
+                    
+                    <div class="card-image-wrapper" [routerLink]="['/dashboard/catalog', item.id]">
+                        <img [src]="item.imageUrl || 'https://placehold.co/600x400?text=No+Image'" 
+                             alt="Katalog Kapağı" class="card-img">
+                        
+                        <div class="status-badge" [ngClass]="getStatusClass(item.status)">
+                            {{ getStatusText(item.status) }}
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="card-top">
+                            <h3 class="card-title" [routerLink]="['/dashboard/catalog', item.id]" title="{{ item.name }}">
+                                {{ item.name }}
+                            </h3>
+                            <button (click)="deleteCatalog(item.id, $event)" class="delete-btn" title="Kataloğu Sil">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
+
+                        <div class="card-actions">
+                            @if (item.status === 'ReadyToProcess' || item.status === 'Draft' || !item.status) {
+                                <button (click)="startAiAnalysis(item, $event)" 
+                                        [disabled]="isProcessing"
+                                        class="action-btn btn-ai">
+                                    <span class="material-symbols-outlined">smart_toy</span>
+                                    AI Analizini Başlat
+                                </button>
+                            }
+                            @else if (item.status === 'Processing' || item.status === 'Uploading') {
+                                <div class="action-status status-processing">
+                                    <span class="material-symbols-outlined spinner-sm">sync</span>
+                                    İşleniyor...
+                                </div>
+                            }
+                            @else if (item.status === 'AI_Completed') {
+                                <div class="action-status status-completed">
+                                    <span class="material-symbols-outlined">check_circle</span>
+                                    Analiz Tamamlandı
+                                </div>
+                            }
+                            @else if (item.status === 'Error') {
+                                <div class="action-status status-error">
+                                    <span class="material-symbols-outlined">error</span>
+                                    Hata Oluştu
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="card-footer">
+                            <div class="meta-item">
+                                <span class="material-symbols-outlined">calendar_today</span>
+                                {{ item.createdDate | date:'dd.MM.yyyy' }}
+                            </div>
+                            <div class="meta-divider"></div>
+                            <div class="meta-item">
+                                <span class="material-symbols-outlined">settings_suggest</span>
+                                {{ item.partCount || 0 }} Parça
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

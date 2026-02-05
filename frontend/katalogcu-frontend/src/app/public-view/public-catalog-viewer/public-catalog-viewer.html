@@ -1,0 +1,192 @@
+<div class="viewer-layout">
+
+    <aside class="sidebar-left minimalist" [class.collapsed]="!isSidebarOpen">
+        <div class="sidebar-header icon-only">
+            <a [routerLink]="['/view', catalogId]" class="back-link" title="Vitrine Dön">
+                <span class="material-symbols-outlined icon">arrow_back</span>
+            </a>
+        </div>
+
+        <div class="sidebar-content custom-scroll">
+            @for (group of groups; track group.pageIndex) {
+                <div (click)="selectGroup(group)"
+                     class="page-item-minimal"
+                     [class.active]="activeGroupIndex === group.pageIndex"
+                     [title]="group.title">
+                    <div class="thumbnail-box">
+                        <img [src]="group.imageUrl || 'assets/placeholder.png'" loading="lazy" class="thumb-img">
+                        <span class="page-number-overlay">{{ group.pageNumber }}</span>
+                    </div>
+                </div>
+            }
+        </div>
+    </aside>
+
+    <main class="main-canvas">
+        <div class="canvas-toolbar">
+            <button (click)="isSidebarOpen = !isSidebarOpen" class="tool-btn toggle-sidebar" title="Menüyü Aç/Kapa">
+                <span class="material-symbols-outlined icon">side_navigation</span>
+            </button>
+            
+            <div class="page-label">
+                <h2>{{ activePage?.aiDescription || 'Teknik Resim' }}</h2>
+            </div>
+
+            <div class="zoom-controls">
+                <button (click)="transform.scale = transform.scale - 0.1" class="zoom-btn"><span class="material-symbols-outlined">remove</span></button>
+                <span class="zoom-level">{{ (transform.scale * 100) | number:'1.0-0' }}%</span>
+                <button (click)="transform.scale = transform.scale + 0.1" class="zoom-btn"><span class="material-symbols-outlined">add</span></button>
+                <div class="separator"></div>
+                <button (click)="resetZoom()" class="zoom-btn reset"><span class="material-symbols-outlined">center_focus_strong</span></button>
+            </div>
+
+            <div class="cart-trigger" (click)="isCartOpen = true">
+                <span class="material-symbols-outlined icon">shopping_cart</span>
+                @if ((cartService.totalCount$ | async) || 0 > 0) {
+                    <span class="cart-badge">{{ cartService.totalCount$ | async }}</span>
+                }
+            </div>
+        </div>
+
+        <div class="viewport" 
+             (mousedown)="startDrag($event)" 
+             (mousemove)="onDrag($event)" 
+             (mouseup)="endDrag()" 
+             (mouseleave)="endDrag()" 
+             (wheel)="onWheel($event)">
+             
+             @if (activePage) {
+                <div class="transform-layer" [style.transform]="'translate(' + transform.x + 'px, ' + transform.y + 'px) scale(' + transform.scale + ')'">
+                    <img [src]="activePage.imageUrl" class="technical-drawing" draggable="false">
+                    
+                    @for (spot of activePage.hotspots; track $index) {
+                        <div class="hotspot" (click)="$event.stopPropagation(); onHotspotClick(spot.label)"
+                             [style.top.%]="spot.top" 
+                             [style.left.%]="spot.left" 
+                             [style.width.%]="spot.width" 
+                             [style.height.%]="spot.height"
+                             [class.selected]="selectedPartLabel === spot.label">
+                             <span class="hotspot-tooltip">{{ spot.label }}</span>
+                        </div>
+                    }
+                </div>
+             }
+        </div>
+        
+        @if (selectedItem && selectedItem.isStocked) {
+             <div class="mobile-product-card">
+                 <div class="mp-ref-box"><span class="mp-label">REF</span><span class="mp-ref">{{ selectedItem.refNo }}</span></div>
+                 <div class="mp-info">
+                     <div class="mp-code">{{ selectedItem.partCode }}</div>
+                     <div class="mp-name">{{ selectedItem.localName || selectedItem.partName }}</div>
+                 </div>
+                 <button class="mp-add-btn" (click)="addToCart(selectedItem)">
+                     <span class="material-symbols-outlined">add_shopping_cart</span>
+                 </button>
+             </div>
+        }
+    </main>
+
+    <aside class="sidebar-right wide-panel">
+        <div class="sidebar-header right">
+            <h3>Parça Listesi</h3>
+            <span class="count-badge">{{ filteredItems.length }}</span>
+        </div>
+
+        <div class="search-container">
+            <div class="input-wrapper">
+                <span class="material-symbols-outlined search-icon">search</span>
+                <input type="text" [ngModel]="searchQuery" (ngModelChange)="onSearch($event)" placeholder="Kod veya Ref No Ara..." class="search-input">
+            </div>
+        </div>
+
+        <div class="table-header simple">
+            <div class="col-no">NO</div><div class="col-info">PARÇA DETAYI</div>
+        </div>
+
+        <div class="sidebar-content custom-scroll bg-white">
+            @if (isLoading) { <div class="loading-state"><div class="spinner-inline"></div> Yükleniyor...</div> }
+            
+            @for (item of filteredItems.slice(0, 100); track item.catalogItemId) {
+                <div [id]="'row-' + item.catalogItemId" 
+                     (click)="onItemClick(item)" 
+                     class="table-row big-row" 
+                     [class.highlight]="selectedItem?.catalogItemId === item.catalogItemId">
+                    
+                    <div class="col-no cell-ref-circle">{{ item.refNo || '-' }}</div>
+                    
+                    <div class="col-info product-details">
+                        <div class="prod-code">{{ item.partCode }}</div>
+                        <div class="prod-name" [class.text-muted]="!item.isStocked">
+                            {{ item.isStocked ? (item.localName || item.partName) : item.partName }}
+                        </div>
+                        
+                        <div class="prod-price-sm">
+                            @if (item.isStocked) {
+                                <span class="price-tag">{{ item.price | currency:'TRY':'symbol-narrow' }}</span>
+                            } @else {
+                                <span class="badge-gray">KATALOG ÜRÜNÜ</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (item.isStocked) {
+                        <button (click)="$event.stopPropagation(); addToCart(item)" class="add-cart-btn">
+                            <span class="material-symbols-outlined">add_shopping_cart</span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </aside>
+
+    <div class="cart-sidebar" [class.open]="isCartOpen">
+        <div class="cart-header">
+            <h3>Sipariş Detayı</h3>
+            <button (click)="isCartOpen = false" class="close-btn"><span class="material-symbols-outlined">close</span></button>
+        </div>
+
+        <div class="cart-items custom-scroll">
+            @if ((cartService.cart$ | async)?.length === 0) {
+                <div class="empty-cart"><p>Sepetiniz henüz boş.</p></div>
+            }
+            @for (item of cartService.cart$ | async; track item.product.catalogItemId) {
+                <div class="cart-item">
+                    <div class="item-info">
+                        <span class="item-code">{{ item.product.partCode }}</span>
+                        <span class="item-name">{{ item.product.partName }}</span>
+                        <span class="item-price">{{ item.product.price | currency:'TRY':'symbol-narrow' }}</span>
+                    </div>
+                    <div class="item-actions">
+                        <button (click)="cartService.updateQuantity(item.product.catalogItemId, item.quantity - 1)">-</button>
+                        <span class="qty-text">{{ item.quantity }}</span>
+                        <button (click)="cartService.addToCart(item.product)">+</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="cart-footer">
+            <div class="total-row">
+                <span>Toplam:</span>
+                <span class="total-price">{{ cartService.totalPrice$ | async | currency:'TRY':'symbol-narrow' }}</span>
+            </div>
+
+            <div class="order-form-mini">
+                <input [(ngModel)]="customerForm.name" type="text" placeholder="Adınız Soyadınız *" class="form-input-sm">
+                <input [(ngModel)]="customerForm.phone" type="tel" placeholder="Telefonunuz *" class="form-input-sm">
+            </div>
+            
+            <button (click)="submitOrder()" 
+                    [disabled]="isSubmitting || !customerForm.name || !customerForm.phone"
+                    class="checkout-btn main-action">
+                @if(isSubmitting) { <span class="spinner-sm"></span> }
+                Siparişi Onayla
+            </button>
+            
+            </div>
+    </div>
+
+    @if (isCartOpen) { <div class="overlay" (click)="isCartOpen = false"></div> }
+
+</div>

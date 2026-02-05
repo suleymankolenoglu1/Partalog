@@ -1,0 +1,124 @@
+<div class="apple-dashboard-wrapper">
+    
+    <header class="apple-header">
+        <div class="apple-title">
+            <h1>Genel Bakış</h1>
+            <p>İşletmenizin anlık performans durumu.</p>
+        </div>
+        <button class="apple-btn">
+            <span class="material-symbols-outlined" style="font-size: 18px;">add</span>
+            Katalog Yükle
+        </button>
+    </header>
+
+    <section class="apple-grid">
+        
+        <div class="apple-card">
+            <div class="apple-card-header">
+                <span class="apple-label">Toplam Katalog</span>
+                <span class="material-symbols-outlined" style="color: #86868B;">menu_book</span>
+            </div>
+            <div>
+                <div class="apple-value">{{ isLoading ? '-' : stats?.totalCatalogs }}</div>
+                <div class="apple-trend trend-green">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">trending_up</span>
+                    Aktif Kataloglar
+                </div>
+            </div>
+        </div>
+
+        <div class="apple-card">
+            <div class="apple-card-header">
+                <span class="apple-label">Aktif Parça</span>
+                <span class="material-symbols-outlined" style="color: #86868B;">settings_suggest</span>
+            </div>
+            <div>
+                <div class="apple-value">{{ isLoading ? '-' : (stats?.totalParts | number) }}</div>
+                <div class="apple-trend trend-gray">
+                    Parça veritabanı
+                </div>
+            </div>
+        </div>
+
+        <div class="apple-card">
+            <div class="apple-card-header">
+                <span class="apple-label">Görüntülenme</span>
+                <span class="material-symbols-outlined" style="color: #86868B;">visibility</span>
+            </div>
+            <div>
+                <div class="apple-value">{{ isLoading ? '-' : (stats?.totalViews | number) }}</div>
+                <div class="apple-trend trend-green">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">trending_up</span>
+                    Toplam erişim
+                </div>
+            </div>
+        </div>
+
+        <div class="apple-card">
+            <div class="apple-card-header">
+                <span class="apple-label">Bekleyen</span>
+                <span class="material-symbols-outlined" style="color: #86868B;">pending_actions</span>
+            </div>
+            <div>
+                <div class="apple-value">{{ isLoading ? '-' : stats?.pendingCount }}</div>
+                <div class="apple-trend trend-orange">
+                    İşlem gerektiriyor
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="apple-table-container">
+        <div class="apple-table-header">
+            <h3>Son Yüklenenler</h3>
+            <a class="apple-link">Tümünü Gör →</a>
+        </div>
+        <div class="table-responsive">
+            <table class="apple-full-table">
+                <thead>
+                    <tr>
+                        <th>KATALOG ADI</th>
+                        <th>DURUM</th>
+                        <th>PARÇA SAYISI</th>
+                        <th>TARİH</th>
+                        <th style="text-align: right;">İŞLEM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (isLoading) {
+                        <tr><td colspan="5" style="text-align:center; padding: 20px; color:#999;">Veriler yükleniyor...</td></tr>
+                    }
+
+                    @for (item of stats?.recentCatalogs; track item.id) {
+                        <tr>
+                            <td style="font-weight: 500;">{{ item.name }}</td>
+                            <td>
+                                <span class="apple-badge" [ngClass]="getStatusClass(item.status)">
+                                    {{ getStatusLabel(item.status) }}
+                                </span>
+                            </td>
+                            <td style="font-family: monospace; color: #86868B;">
+                                {{ item.partCount > 0 ? item.partCount : '-' }}
+                            </td>
+                            <td style="color: #86868B;">
+                                {{ item.createdDate | date:'d MMMM, HH:mm':'':'tr' }}
+                            </td>
+                            <td style="text-align: right;">
+                                @if (item.status === 'Processing') {
+                                    <span style="color: #D2D2D7; font-size: 11px; font-weight: 700; cursor: wait;">İŞLENİYOR</span>
+                                } @else {
+                                    <span class="apple-link">DÜZENLE</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+
+                    @if (!isLoading && (!stats?.recentCatalogs || stats?.recentCatalogs?.length === 0)) {
+                        <tr><td colspan="5" style="text-align:center; padding: 20px;">Henüz katalog yüklenmemiş.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
