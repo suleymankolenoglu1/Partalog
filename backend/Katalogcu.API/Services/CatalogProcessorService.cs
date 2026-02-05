@@ -17,7 +17,7 @@ public class CatalogProcessorService
     private readonly ILogger<CatalogProcessorService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    // Python API Adresi (Kapak için burada duruyor, diğerleri serviste)
+    // Python API Adresi
     private const string PYTHON_API_URL = "http://localhost:8000";
 
     public CatalogProcessorService(
@@ -66,32 +66,23 @@ public class CatalogProcessorService
             {
                 var fileBytes = await File.ReadAllBytesAsync(fullPath);
 
-                // ---------------------------------------------------------
-                // ADIM 0: KAPAK ANALİZİ (Sadece 1. Sayfa)
-                // ---------------------------------------------------------
+                // ADIM 0: KAPAK ANALİZİ
                 if (page.PageNumber == 1)
                 {
                     await AnalyzeCoverPage(client, catalog, fileBytes);
                 }
 
-                // ---------------------------------------------------------
-                // ADIM 1: SAYFA TÜRÜ VE BAŞLIK ANALİZİ
-                // ---------------------------------------------------------
+                // ADIM 1: SAYFA ANALİZİ
                 var analysis = await _aiService.AnalyzePageAsync(fileBytes);
-
                 page.AiDescription = analysis.Title;
-                _logger.LogInformation($"📄 Analiz Sonucu ({page.PageNumber}): {analysis.Title} | Liste: {analysis.IsPartsList} | Çizim: {analysis.IsTechnicalDrawing}");
-
-                // ---------------------------------------------------------
-                // 🔥 ADIM 2: TABLO VERİSİ VE VEKTÖRLEŞTİRME (GÜNCELLENDİ)
-                // ---------------------------------------------------------
+                
+                // ADIM 2: TABLO VE VEKTÖR
                 if (analysis.IsPartsList)
                 {
                     var extractedItems = await _aiService.ExtractTableAsync(fileBytes, page.PageNumber);
                     
                     if (extractedItems != null && extractedItems.Any())
                     {
-                        // Eski verileri temizle
                         var oldItems = await _context.CatalogItems
                             .Where(ci => ci.CatalogId == catalogId && ci.PageNumber == page.PageNumber.ToString())
                             .ToListAsync();
@@ -109,89 +100,83 @@ public class CatalogProcessorService
                                 Description = item.Description ?? "" 
                             };
 
-                            // --- 🧠 YENİ: Vektör Oluşturma Kısmı ---
-                            // Parçayı temsil eden metni oluşturuyoruz (Ad + Açıklama + Kod)
-                            // Bu metin Google'a gidip "sayısal anlamı" alınıp gelecek.
+                            // --- 🧠 VEKTÖR KISMI ---
                             string textToEmbed = $"{item.PartName} {item.Description} {item.PartCode}".Trim();
-
                             if (!string.IsNullOrEmpty(textToEmbed))
                             {
-                                // Python servisine soruyoruz
                                 var vectorData = await _aiService.GetEmbeddingAsync(textToEmbed);
-                                
                                 if (vectorData != null && vectorData.Length > 0)
                                 {
-                                    // Gelen float dizisini Pgvector formatına çevirip kaydediyoruz
                                     catalogItem.Embedding = new Pgvector.Vector(vectorData);
                                 }
                             }
-                            // ----------------------------------------
+                            // -----------------------
 
                             _context.CatalogItems.Add(catalogItem);
                         }
                         
-                        // Hepsini tek seferde kaydet
                         await _context.SaveChangesAsync();
-                        _logger.LogInformation($"📚 Tablo: {extractedItems.Count} parça (vektörleriyle) kaydedildi.");
+                        _logger.LogInformation($"📚 {extractedItems.Count} parça kaydedildi.");
                     }
                 }
 
-                // ---------------------------------------------------------
-                // ADIM 3: HOTSPOT (Sadece "Teknik Resim" ise çalıştır)
-                // ---------------------------------------------------------
+                // ADIM 3: HOTSPOT
                 if (analysis.IsTechnicalDrawing)
                 {
                     using (var stream = new MemoryStream(fileBytes))
                     {
                         var formFile = CreateFormFile(stream, fullPath);
-                        
                         var oldSpots = await _context.Hotspots.Where(h => h.PageId == page.Id).ToListAsync();
                         _context.Hotspots.RemoveRange(oldSpots);
 
                         var hotspots = await _aiService.DetectHotspotsAsync(formFile, page.Id);
-                        
                         if (hotspots.Any())
                         {
                             await _context.Hotspots.AddRangeAsync(hotspots);
-                            _logger.LogInformation($"🎯 YOLO: {hotspots.Count} nokta bulundu.");
                         }
                     }
                 }
-
-                // Hotspot değişikliklerini de kaydet
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 var msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                _logger.LogError(ex, $"❌ Sayfa {page.PageNumber} işlem hatası: {msg}");
+                _logger.LogError(ex, $"❌ Sayfa {page.PageNumber} hata: {msg}");
             }
         }
 
         _logger.LogInformation($"🏁 Katalog İşlemi Tamamlandı: {catalog.Name}");
+
+        // 👇👇👇 YENİ EKLENEN KISIM: EĞİTİMİ TETİKLE 👇👇👇
+        try
+        {
+            _logger.LogInformation("🚂 Python'a eğitim emri gönderiliyor...");
+            // Python'daki /api/admin/train endpoint'ine boş bir POST atıyoruz.
+            // Fire-and-forget (cevap beklememize gerek yok, arka planda yapsın).
+            await client.PostAsync($"{PYTHON_API_URL}/api/admin/train", null);
+            _logger.LogInformation("✅ Eğitim isteği gönderildi.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"⚠️ Eğitim tetiklenemedi (Sorun değil, sonraki katalogda öğrenir): {ex.Message}");
+        }
+        // 👆👆👆 --------------------------------------- 👆👆👆
     }
 
-    // --- YARDIMCI METODLAR ---
-
+    // --- YARDIMCI METODLAR (Aynı) ---
     private async Task AnalyzeCoverPage(HttpClient client, Catalog catalog, byte[] fileBytes)
     {
         try
         {
             using var content = new MultipartFormDataContent();
-            var fileContent = new ByteArrayContent(fileBytes);
-            content.Add(fileContent, "file", "cover.jpg");
-
+            content.Add(new ByteArrayContent(fileBytes), "file", "cover.jpg");
             var response = await client.PostAsync($"{PYTHON_API_URL}/api/table/extract-metadata", content);
-            
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
                 var metadata = JsonSerializer.Deserialize<MetadataResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                
                 if (metadata != null && !string.IsNullOrEmpty(metadata.MachineModel))
-                {
                     catalog.Name = $"{metadata.MachineModel} ({metadata.CatalogTitle})";
-                }
             }
         }
         catch (Exception ex) { _logger.LogError($"Kapak hatası: {ex.Message}"); }

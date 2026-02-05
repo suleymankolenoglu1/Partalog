@@ -1,30 +1,38 @@
+"""
+Partalog AI - Sanayi Sözlüğü Eğitmeni (Auto-Trainer)
+Görevi: Veritabanındaki yeni İngilizce parça isimlerini bulur ve
+Gemini'ye "Sanayide buna ne denir?" diye sorarak sözlüğü günceller.
+"""
+
 import os
 import json
 import time
 import pandas as pd
 import google.generativeai as genai
 from sqlalchemy import create_engine
-from config import settings  # API KEY'in config.py içinde olduğu varsayılıyor
+from config import settings # <--- AYARLARI BURADAN ÇEKİYORUZ
+from loguru import logger
 
 # ==========================================
-# ⚙️ AYARLAR (Senin Bilgilerinle Güncellendi)
+# ⚙️ AYARLAR
 # ==========================================
 
-# Format: postgresql://kullanici:sifre@host:port/veritabani
-# Senin Portun: 5435 (Standart 5432 değil, dikkat ettim)
-DB_CONNECTION_STRING = "postgresql://postgres:Password123!@localhost:5435/KatalogcuDb"
+# DB Bağlantısı (Artık config dosyasından geliyor)
+DB_CONNECTION_STRING = settings.DB_CONNECTION_STRING
 
 BATCH_SIZE = 40           # Gemini'ye tek seferde sorulacak kelime sayısı
-OUTPUT_FILE = "sanayi_sozlugu.json"  # Sözlüğün kaydedileceği dosya
+OUTPUT_FILE = "sanayi_sozlugu.json"
 
 # Gemini Konfigürasyonu
+model = None
 try:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash-lite') 
+    if not settings.GEMINI_API_KEY:
+        logger.warning("⚠️ [EĞİTİM] API Key bulunamadı (settings.GEMINI_API_KEY boş). Eğitim yapılamayacak.")
+    else:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-2.0-flash-lite') 
 except Exception as e:
-    print(f"⚠️ API Key Hatası: {e}")
-    print("Lütfen config.py dosyasında GEMINI_API_KEY olduğundan emin ol.")
-    exit()
+    logger.critical(f"⚠️ [EĞİTİM] Gemini Başlatma Hatası: {e}")
 
 # ==========================================
 # 🛠️ FONKSİYONLAR
@@ -32,11 +40,11 @@ except Exception as e:
 
 def get_db_terms():
     """Veritabanındaki tüm benzersiz İngilizce parça isimlerini çeker."""
-    print("🔌 Veritabanına bağlanılıyor...")
+    logger.info(f"🔌 [EĞİTİM] Veritabanına bağlanılıyor... (Host: {DB_CONNECTION_STRING.split('@')[-1]})")
     try:
         engine = create_engine(DB_CONNECTION_STRING)
         
-        # Sadece İngilizce adı dolu olanları ve kısa olmayanları çekiyoruz
+        # Sadece İngilizce adı dolu olanları ve kısa olmayanları çekiyoruz (En az 3 harf)
         query = """
         SELECT DISTINCT "PartName" 
         FROM "CatalogItems" 
@@ -46,13 +54,13 @@ def get_db_terms():
         
         df = pd.read_sql(query, engine)
         
-        # Veriyi temizle ve listeye çevir
+        # Veriyi temizle ve listeye çevir (Büyük harf yap)
         terms_list = df['PartName'].str.strip().str.upper().unique().tolist()
-        print(f"📊 Veritabanında toplam {len(terms_list)} adet benzersiz parça ismi bulundu.")
+        logger.info(f"📊 [EĞİTİM] Veritabanında toplam {len(terms_list)} adet benzersiz parça ismi bulundu.")
         return set(terms_list)
     except Exception as e:
-        print(f"❌ Veritabanı Bağlantı Hatası: {e}")
-        print("Lütfen connection string'i ve veritabanının ayakta olduğunu kontrol et.")
+        logger.error(f"❌ [EĞİTİM] Veritabanı Bağlantı Hatası: {e}")
+        logger.warning("💡 İPUCU: 'config.py' veya '.env' dosyasındaki DB bağlantı adresini kontrol et.")
         return set()
 
 def load_existing_dictionary():
@@ -61,16 +69,20 @@ def load_existing_dictionary():
         try:
             with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            print(f"📚 Mevcut hafıza yüklendi: {len(data)} kelime biliniyor.")
+            logger.info(f"📚 [EĞİTİM] Mevcut hafıza yüklendi: {len(data)} kelime biliniyor.")
             return data
         except Exception as e:
-            print(f"⚠️ Dosya okuma hatası, sıfırdan başlanıyor: {e}")
+            logger.error(f"⚠️ [EĞİTİM] Dosya okuma hatası, sıfırdan başlanıyor: {e}")
             return {}
     return {}
 
 def ask_gemini_batch(terms_batch):
     """Gemini'ye sanayi argosunu sorar."""
     
+    if not model:
+        logger.error("❌ [EĞİTİM] Model başlatılamadığı için sorgu yapılamıyor.")
+        return {}
+
     prompt = f"""
     Sen Türkiye sanayisinde (tekstil makineleri) uzmanlaşmış bir usta başısın.
     Aşağıdaki İngilizce teknik parça isimlerinin, Türkiye sanayisinde kullanılan "Usta Argosu" (Jargon) karşılıklarını ver.
@@ -97,24 +109,30 @@ def ask_gemini_batch(terms_batch):
     try:
         response = model.generate_content(prompt)
         text = response.text
+        # JSON temizliği (Markdown taglerini temizle)
         clean_text = text.replace("```json", "").replace("```", "").strip()
+        
+        # Bazen Gemini JSON'ın sonuna fazladan karakter koyabilir, basit temizlik
+        if not clean_text.endswith("}"):
+             clean_text = clean_text[:clean_text.rfind("}")+1]
+
         return json.loads(clean_text)
     except Exception as e:
-        print(f"⚠️ API/Parsing Hatası (Bu grup atlanıyor): {e}")
+        logger.warning(f"⚠️ [EĞİTİM] API/Parsing Hatası (Bu grup atlanıyor): {e}")
         return {}
 
 # ==========================================
-# 🚀 ANA AKIŞ
+# 🚀 ANA AKIŞ (main.py tarafından çağrılır)
 # ==========================================
 def main():
-    print("--- 🧠 PARTALOG AI SÖZLÜK EĞİTİMİ BAŞLIYOR ---")
+    logger.info("--- 🧠 PARTALOG AI SÖZLÜK EĞİTİMİ BAŞLIYOR (AUTO) ---")
 
     # 1. Verileri Hazırla
     existing_dict = load_existing_dictionary() 
     db_terms_set = get_db_terms()              
     
     if not db_terms_set:
-        print("❌ Veritabanından veri çekilemedi. İşlem iptal.")
+        logger.error("❌ [EĞİTİM] Veritabanından veri çekilemedi veya veritabanı boş. İşlem iptal.")
         return
 
     known_terms_set = set(existing_dict.keys()) 
@@ -124,11 +142,11 @@ def main():
     count_new = len(new_terms_to_learn)
 
     if count_new == 0:
-        print("\n✅ SİSTEM ZATEN GÜNCEL! Öğrenilecek yeni kelime yok.")
+        logger.success("✅ [EĞİTİM] SİSTEM ZATEN GÜNCEL! Öğrenilecek yeni kelime yok.")
         return
 
-    print(f"\n🚀 TESPİT EDİLDİ: {count_new} adet yeni kelime öğrenilecek.")
-    print("☕ Kahveni al, Gemini ustalarla görüşmeye başlıyor...\n")
+    logger.info(f"🚀 [EĞİTİM] TESPİT EDİLDİ: {count_new} adet yeni kelime öğrenilecek.")
+    logger.info("☕ Kahveni al, Gemini ustalarla görüşmeye başlıyor...")
 
     # 3. Öğrenme Döngüsü
     newly_learned_data = {}
@@ -138,29 +156,33 @@ def main():
         batch = new_terms_to_learn[i:i + BATCH_SIZE]
         current_batch_num = (i // BATCH_SIZE) + 1
         
-        print(f"⏳ [{current_batch_num}/{total_batches}] İşleniyor: {batch[:3]}... (+{len(batch)-3} adet)")
+        logger.info(f"⏳ [EĞİTİM] Batch [{current_batch_num}/{total_batches}] İşleniyor... ({len(batch)} adet)")
         
         batch_result = ask_gemini_batch(batch)
         
         if batch_result:
             newly_learned_data.update(batch_result)
-            print(f"   ✅ {len(batch_result)} kelime öğrenildi.")
+            logger.info(f"   ✅ {len(batch_result)} kelime hafızaya alındı.")
         else:
-            print("   ⚠️ Cevap alınamadı, pas geçiliyor.")
+            logger.warning("   ⚠️ Cevap alınamadı, pas geçiliyor.")
 
         time.sleep(1.5) # API Rate Limit koruması
 
     # 4. Kaydetme
     if newly_learned_data:
-        print("\n💾 Yeni bilgiler hafızaya işleniyor...")
+        logger.info("💾 [EĞİTİM] Yeni bilgiler diske yazılıyor...")
         existing_dict.update(newly_learned_data)
         
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            json.dump(existing_dict, f, ensure_ascii=False, indent=4)
-        
-        print(f"🎉 İŞLEM TAMAMLANDI! Toplam Bilgi: {len(existing_dict)} kelime.")
+        try:
+            with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+                json.dump(existing_dict, f, ensure_ascii=False, indent=4)
+            
+            logger.success(f"🎉 [EĞİTİM] İŞLEM TAMAMLANDI! Toplam Sözlük Bilgisi: {len(existing_dict)} kelime.")
+        except Exception as e:
+            logger.error(f"❌ [EĞİTİM] Dosya yazma hatası: {e}")
     else:
-        print("\n⚠️ Yeni veri öğrenilemedi (Hata oluşmuş olabilir).")
+        logger.warning("⚠️ [EĞİTİM] Yeni veri öğrenilemedi (Hata oluşmuş olabilir).")
 
+# Eğer dosya doğrudan terminalden çalıştırılırsa
 if __name__ == "__main__":
     main()

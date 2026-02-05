@@ -1,0 +1,4 @@
+/* Teknik resim hissi vermek için */
+img {
+    filter: contrast(1.1) grayscale(0.2);
+}

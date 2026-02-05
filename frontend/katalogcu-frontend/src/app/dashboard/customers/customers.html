@@ -1,0 +1,122 @@
+<div class="apple-page-wrapper">
+    
+    <header class="page-header">
+        <div class="header-content">
+            <h1>Müşteriler</h1>
+            <p>Bayi ve servis ağınızı yönetin.</p>
+        </div>
+        
+        <div class="header-actions">
+            <button class="btn-primary">
+                <span class="material-symbols-outlined icon">person_add</span>
+                Yeni Müşteri
+            </button>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="search-wrapper">
+            <span class="material-symbols-outlined search-icon">search</span>
+            <input type="text" placeholder="İsim, firma veya e-posta ara..." class="search-input">
+        </div>
+
+        <div class="filter-group">
+            <select class="filter-select">
+                <option>Tüm Durumlar</option>
+                <option>Aktif</option>
+                <option>Pasif</option>
+                <option>Engelli</option>
+            </select>
+            
+            <button class="icon-btn filter-btn" title="Gelişmiş Filtre">
+                <span class="material-symbols-outlined">filter_list</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="col-profile">MÜŞTERİ / FİRMA</th>
+                        <th>İLETİŞİM</th>
+                        <th>BAKİYE</th>
+                        <th>DURUM</th>
+                        <th>SON SİPARİŞ</th>
+                        <th class="text-right">İŞLEM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (customer of customers; track customer.id) {
+                        <tr class="data-row">
+                            
+                            <td>
+                                <div class="profile-cell">
+                                    <img [src]="'https://ui-avatars.com/api/?name=' + customer.name + '&background=random&color=fff'" 
+                                         class="avatar" alt="Avatar">
+                                    <div class="profile-info">
+                                        <span class="customer-name">{{ customer.name }}</span>
+                                        <span class="company-name">{{ customer.company }}</span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="contact-stack">
+                                    <div class="contact-item">
+                                        <span class="material-symbols-outlined icon-xs">mail</span>
+                                        {{ customer.email }}
+                                    </div>
+                                    <div class="contact-item">
+                                        <span class="material-symbols-outlined icon-xs">call</span>
+                                        {{ customer.phone }}
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                <span class="balance-text" [ngClass]="getBalanceClass(customer.balance)">
+                                    {{ customer.balance | currency:'TRY':'symbol-narrow' }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="status-badge" [ngClass]="getStatusBadge(customer.status)">
+                                    {{ customer.status === 'active' ? 'Aktif' : (customer.status === 'blocked' ? 'Engelli' : 'Pasif') }}
+                                </span>
+                            </td>
+
+                            <td class="date-text">
+                                {{ customer.lastOrder }}
+                            </td>
+
+                            <td class="text-right">
+                                <div class="row-actions">
+                                    <button class="action-icon view" title="Detay">
+                                        <span class="material-symbols-outlined">visibility</span>
+                                    </button>
+                                    <button class="action-icon edit" title="Düzenle">
+                                        <span class="material-symbols-outlined">edit</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination-bar">
+            <span class="pagination-info">1-5 / 42 Müşteri</span>
+            <div class="pagination-controls">
+                <button class="page-btn" disabled>
+                    <span class="material-symbols-outlined">chevron_left</span>
+                </button>
+                <button class="page-btn">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

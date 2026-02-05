@@ -1,0 +1,165 @@
+<div class="flex flex-col h-screen w-full bg-slate-900 text-white overflow-hidden font-sans select-none">
+    
+    <header class="h-16 shrink-0 bg-slate-950 border-b border-slate-800 flex items-center justify-between px-4 z-50 relative shadow-md">
+        <div class="flex items-center gap-4">
+            <a routerLink="/public-view" class="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
+            <div>
+                <h1 class="font-bold text-lg leading-tight text-slate-100">{{ catalog?.name || 'Yükleniyor...' }}</h1>
+                <p class="text-xs text-slate-500">Parça Kataloğu</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+            <button (click)="prevPage()" [disabled]="activePageIndex === 0" 
+                    class="p-1.5 hover:bg-slate-700 rounded disabled:opacity-30 transition-colors">
+                <span class="material-symbols-outlined text-[20px]">chevron_left</span>
+            </button>
+            <span class="px-3 text-sm font-mono text-slate-300 min-w-[80px] text-center">
+                {{ activePageIndex + 1 }} / {{ catalog?.pages?.length || 1 }}
+            </span>
+            <button (click)="nextPage()" [disabled]="!catalog?.pages || activePageIndex === (catalog!.pages!.length - 1)" 
+                    class="p-1.5 hover:bg-slate-700 rounded disabled:opacity-30 transition-colors">
+                <span class="material-symbols-outlined text-[20px]">chevron_right</span>
+            </button>
+        </div>
+        <div class="flex gap-2"></div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden relative w-full">
+        
+        <div class="flex-1 bg-slate-900 relative overflow-hidden flex items-center justify-center"
+             (mousedown)="startDrag($event)" (mousemove)="onDrag($event)" (mouseup)="endDrag()" (mouseleave)="endDrag()" (wheel)="onWheel($event)"
+             [style.cursor]="isDragging ? 'grabbing' : 'grab'">
+            
+            @if (isLoading) {
+                <div class="flex flex-col items-center gap-2">
+                    <span class="material-symbols-outlined animate-spin text-4xl text-amber-500">sync</span>
+                    <span class="text-sm text-slate-500">Yükleniyor...</span>
+                </div>
+            }
+            @else if (activePage) {
+                
+                <div class="relative transition-transform duration-75 ease-out origin-center"
+                     [style.transform]="'translate(' + transform.x + 'px, ' + transform.y + 'px) scale(' + transform.scale + ')'">
+                    
+                    <img [src]="activePage.imageUrl" class="block max-h-[80vh] w-auto shadow-2xl pointer-events-none" alt="Teknik Çizim" draggable="false"> 
+
+                    @for (spot of activePage.hotspots; track $index) {
+                        <div class="absolute cursor-pointer group border border-transparent hover:border-amber-500 hover:bg-amber-500/10 transition-all z-20 rounded-sm"
+                             (click)="onHotspotClick(spot.label, spot.productId)"
+                             [class.border-amber-500]="selectedPartLabel === spot.label"
+                             [class.bg-amber-500-20]="selectedPartLabel === spot.label"
+                             [style.left.%]="spot.left"
+                             [style.top.%]="spot.top"
+                             [style.width.%]="spot.width"
+                             [style.height.%]="spot.height">
+                            
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-slate-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-30 pointer-events-none shadow-xl border border-slate-700">
+                                <span class="text-amber-500 font-bold">#{{ spot.label }}</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (selectedProduct) {
+                    <div class="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-slate-800/95 backdrop-blur-xl border border-amber-500/50 rounded-2xl p-4 shadow-2xl z-[100] slide-up flex items-center gap-4 cursor-default"
+                         (mousedown)="$event.stopPropagation()">
+                        
+                        <div class="flex flex-col items-center justify-center bg-slate-900 rounded-xl h-14 w-14 border border-slate-700 shrink-0 shadow-inner">
+                            <span class="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Ref</span>
+                            <span class="text-2xl font-bold text-amber-500">{{ selectedProduct.refNo }}</span>
+                        </div>
+                        
+                        <div class="flex-1 min-w-0 flex flex-col justify-center">
+                            <div class="text-xs text-amber-500/80 font-mono mb-0.5 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[10px]">barcode</span>
+                                {{ selectedProduct.code }}
+                            </div>
+                            <div class="text-base font-bold text-white truncate leading-tight" title="{{ selectedProduct.name }}">
+                                {{ selectedProduct.name }}
+                            </div>
+                            @if(selectedProduct.stockQuantity) {
+                                <div class="text-[10px] text-slate-400 mt-1">Stok: {{ selectedProduct.stockQuantity }} Adet</div>
+                            }
+                        </div>
+
+                        <button class="shrink-0 size-8 flex items-center justify-center rounded-full bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                                (click)="selectedProductId = null; selectedPartLabel = null" title="Kapat">
+                            <span class="material-symbols-outlined text-lg">close</span>
+                        </button>
+                    </div>
+                }
+
+                <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-800/90 backdrop-blur-md border border-slate-700 rounded-full p-2 flex items-center gap-2 shadow-2xl z-40">
+                    <button (click)="zoomOut()" class="size-10 rounded-full hover:bg-slate-700 text-white flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined">remove</span>
+                    </button>
+                    
+                    <span class="w-16 text-center text-sm font-mono text-amber-500 font-bold">
+                        {{ (transform.scale * 100) | number:'1.0-0' }}%
+                    </span>
+
+                    <button (click)="zoomIn()" class="size-10 rounded-full hover:bg-slate-700 text-white flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined">add</span>
+                    </button>
+                    
+                    <div class="w-px h-6 bg-slate-600 mx-1"></div>
+
+                    <button (click)="resetZoom()" class="size-10 rounded-full hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined">center_focus_strong</span>
+                    </button>
+                </div>
+            }
+        </div>
+
+        <aside class="w-96 bg-slate-950 border-l border-slate-800 flex flex-col shrink-0 z-40 shadow-xl">
+             <div class="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm flex justify-between items-center">
+                <h2 class="font-bold text-slate-200 flex items-center gap-2 text-sm uppercase tracking-wide">
+                    <span class="material-symbols-outlined text-amber-500">list</span>
+                    Parça Listesi ({{ currentPageProducts.length }})
+                </h2>
+            </div>
+            
+            <div class="grid grid-cols-12 gap-2 px-4 py-2 bg-slate-900 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase">
+                <div class="col-span-2 text-center">No</div>
+                <div class="col-span-4">Parça Kodu</div>
+                <div class="col-span-6">Parça Adı</div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar">
+                 @for (prod of currentPageProducts; track prod.id) {
+                    <div [id]="'product-row-' + prod.id"
+                         (click)="onProductClick(prod)" 
+                         [class.bg-slate-800]="selectedProductId === prod.id"
+                         [class.border-l-4]="selectedProductId === prod.id"
+                         [class.border-amber-500]="selectedProductId === prod.id"
+                         class="grid grid-cols-12 gap-2 items-center p-3 border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors cursor-pointer group text-xs border-l-4 border-transparent">
+                        
+                        <div class="col-span-2 text-center font-bold" 
+                             [class.text-amber-500]="selectedProductId === prod.id"
+                             [class.text-slate-400]="selectedProductId !== prod.id">
+                            {{ prod.refNo || '-' }}
+                        </div>
+
+                        <div class="col-span-4 font-mono text-slate-300 truncate" title="{{ prod.code }}">
+                            {{ prod.code }}
+                        </div>
+
+                        <div class="col-span-6 text-slate-400 truncate group-hover:text-white transition-colors" title="{{ prod.name }}">
+                            {{ prod.name }}
+                        </div>
+                    </div>
+                 }
+
+                 @if (currentPageProducts.length === 0) {
+                    <div class="flex flex-col items-center justify-center h-full text-slate-600 gap-2 p-8 text-center">
+                        <span class="material-symbols-outlined text-4xl opacity-50">toc</span>
+                        <p class="text-sm">Bu sayfada listelenecek parça bulunamadı.</p>
+                    </div>
+                 }
+            </div>
+        </aside>
+    </div>
+</div>

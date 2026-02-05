@@ -1,0 +1,102 @@
+<div class="flex flex-col gap-6 bg-[#F9F8F6] p-6 min-h-screen text-blue-900 font-sans">
+    
+    <div class="max-w-3xl mx-auto w-full">
+        
+        <div class="flex items-center gap-4 mb-8">
+            <a routerLink="/dashboard/parts" class="p-2 rounded-full hover:bg-blue-100 text-blue-600 transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-blue-950">Yeni Parça Ekle</h1>
+                <p class="text-blue-700/70">Envantere yeni bir yedek parça girişi yapın.</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-xl shadow-sm border border-blue-100">
+            <form (ngSubmit)="onSubmit()">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-sm font-bold text-blue-950 mb-2">Parça Adı <span class="text-red-500">*</span></label>
+                        <input [(ngModel)]="model.name" name="name" type="text" placeholder="Örn: Ön Fren Balatası" required
+                               class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 placeholder-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="block text-sm font-bold text-blue-950 mb-2">OEM / Parça Kodu <span class="text-red-500">*</span></label>
+                        <input [(ngModel)]="model.code" name="code" type="text" placeholder="Örn: 123-456-AB" required
+                               class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 placeholder-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-blue-950 mb-2">Kategori</label>
+                        <div class="relative">
+                            <select [(ngModel)]="model.category" name="category" 
+                                    class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all cursor-pointer appearance-none">
+                                <option value="">Seçiniz...</option>
+                                <option value="Motor">Motor</option>
+                                <option value="Fren Sistemi">Fren Sistemi</option>
+                                <option value="Kaporta">Kaporta</option>
+                                <option value="Elektrik">Elektrik</option>
+                                <option value="Yürüyen Aksam">Yürüyen Aksam</option>
+                            </select>
+                            <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none">expand_more</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-blue-950 mb-2">Bağlı Katalog <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <select [(ngModel)]="model.catalogId" name="catalogId" required
+                                    class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all cursor-pointer appearance-none">
+                                <option value="" disabled selected>Bir katalog seçin</option>
+                                @for (cat of catalogs; track cat.id) {
+                                    <option [value]="cat.id">{{ cat.name }}</option>
+                                }
+                            </select>
+                            <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none">expand_more</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-blue-950 mb-2">Satış Fiyatı (₺)</label>
+                        <input [(ngModel)]="model.price" name="price" type="number" min="0" placeholder="0.00" 
+                               class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 placeholder-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-blue-950 mb-2">Stok Adedi</label>
+                        <input [(ngModel)]="model.stockQuantity" name="stockQuantity" type="number" min="0" placeholder="0" 
+                               class="w-full h-12 px-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 placeholder-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+
+                    <div class="col-span-2">
+                        <label class="block text-sm font-bold text-blue-950 mb-2">Açıklama</label>
+                        <textarea [(ngModel)]="model.description" name="description" rows="3" placeholder="Parça hakkında ek bilgiler..." 
+                                  class="w-full p-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-900 placeholder-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="flex gap-4 pt-4 border-t border-blue-100">
+                    <button type="button" routerLink="/dashboard/parts" class="flex-1 h-12 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold transition-colors">
+                        İptal
+                    </button>
+                    
+                    <button type="submit" [disabled]="isLoading || !model.name || !model.code || !model.catalogId" 
+                            class="flex-[2] h-12 rounded-lg bg-blue-700 text-white font-bold hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-700/20">
+                        @if (isLoading) {
+                            <span class="material-symbols-outlined animate-spin">sync</span>
+                            Kaydediliyor...
+                        } @else {
+                            <span class="material-symbols-outlined">save</span>
+                            Parçayı Kaydet
+                        }
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>

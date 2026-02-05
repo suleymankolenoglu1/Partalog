@@ -1,0 +1,230 @@
+<div class="apple-page-wrapper">
+    
+    <header class="page-header">
+        <div class="header-content">
+            <h1>Ayarlar</h1>
+            <p>Hesap tercihlerinizi, firma bilgilerinizi ve vitrin görsellerini yönetin.</p>
+        </div>
+    </header>
+
+    <div class="settings-container">
+        
+        <nav class="settings-tabs">
+            <button (click)="setActiveTab('general')" 
+                    class="tab-btn" 
+                    [class.active]="activeTab === 'general'">
+                Genel Bilgiler
+            </button>
+            <button (click)="setActiveTab('security')" 
+                    class="tab-btn" 
+                    [class.active]="activeTab === 'security'">
+                Güvenlik & Şifre
+            </button>
+            <button (click)="setActiveTab('notifications')" 
+                    class="tab-btn" 
+                    [class.active]="activeTab === 'notifications'">
+                Bildirimler
+            </button>
+            <button (click)="setActiveTab('showcase')" 
+                    class="tab-btn" 
+                    [class.active]="activeTab === 'showcase'">
+                Vitrin Yönetimi
+            </button>
+        </nav>
+
+        <div class="settings-card">
+
+            @if (activeTab === 'general') {
+                <div class="tab-content fade-in">
+                    
+                    <div class="profile-section">
+                        <img src="https://ui-avatars.com/api/?name=Ahmet+Yilmaz&background=random&size=128" class="profile-img">
+                        <div class="profile-actions">
+                            <button class="btn-secondary small">
+                                Fotoğraf Yükle
+                            </button>
+                            <p class="hint-text">JPG, GIF veya PNG. Max 1MB.</p>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Ad Soyad</label>
+                            <input type="text" value="Ahmet Yılmaz" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">E-posta</label>
+                            <input type="email" value="ahmet@yilmazoto.com" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Firma Adı</label>
+                            <input type="text" value="Yılmaz Oto Yedek Parça" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Telefon</label>
+                            <input type="text" value="0532 555 44 33" class="form-input">
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (activeTab === 'security') {
+                <div class="tab-content fade-in">
+                    <div class="form-stack max-w-md">
+                        <div class="form-group">
+                            <label class="form-label">Mevcut Şifre</label>
+                            <input type="password" placeholder="••••••••" class="form-input">
+                        </div>
+                        <div class="separator"></div>
+                        <div class="form-group">
+                            <label class="form-label">Yeni Şifre</label>
+                            <input type="password" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Yeni Şifre (Tekrar)</label>
+                            <input type="password" class="form-input">
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (activeTab === 'notifications') {
+                <div class="tab-content fade-in">
+                    <div class="toggles-list">
+                        
+                        <div class="toggle-item">
+                            <div class="toggle-info">
+                                <h4>E-posta Bildirimleri</h4>
+                                <p>Sipariş ve stok durumu hakkında e-posta al.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="toggle-item">
+                            <div class="toggle-info">
+                                <h4>SMS Bildirimleri</h4>
+                                <p>Acil durumlarda telefonuna SMS gönder.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="toggle-item">
+                            <div class="toggle-info">
+                                <h4>Haftalık Rapor</h4>
+                                <p>Her pazartesi haftalık özet raporu gönder.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                    </div>
+                </div>
+            }
+
+            @if (activeTab === 'showcase') {
+                <div class="tab-content fade-in">
+                    
+                    <div class="showcase-upload-section">
+                        <h3 class="section-title">Yeni Banner Ekle</h3>
+                        
+                        <div class="upload-grid">
+                            <div class="upload-box-wrapper">
+                                <label class="upload-box">
+                                    <input type="file" (change)="onFileSelected($event)" accept="image/*,video/*" hidden>
+                                    
+                                    @if (newMedia.url) {
+                                        <div class="preview-container">
+                                            @if (newMedia.type === 'video') {
+                                                <video [src]="newMedia.url" autoplay muted loop class="preview-media"></video>
+                                            } @else {
+                                                <img [src]="newMedia.url" class="preview-media">
+                                            }
+                                            <div class="overlay-change">Değiştir</div>
+                                        </div>
+                                    } @else {
+                                        <div class="placeholder-content">
+                                            <span class="material-symbols-outlined icon-lg">add_photo_alternate</span>
+                                            <span class="text-upload">Resim veya Video Seç</span>
+                                        </div>
+                                    }
+                                </label>
+                            </div>
+
+                            <div class="upload-form">
+                                <div class="form-group">
+                                    <label class="form-label">Başlık</label>
+                                    <input [(ngModel)]="newMedia.title" type="text" placeholder="Örn: 2026 Motor Serisi" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Alt Başlık</label>
+                                    <input [(ngModel)]="newMedia.subtitle" type="text" placeholder="Örn: Şimdi stoklarda." class="form-input">
+                                </div>
+                                <button (click)="addMedia()" 
+                                        [disabled]="!newMedia.url" 
+                                        class="btn-secondary full-width">
+                                    Listeye Ekle
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="showcase-list-section">
+                        <h3 class="section-title">Aktif Görseller</h3>
+                        
+                        <div class="media-list">
+                            @for (item of showcaseItems; track item.id) {
+                                <div class="media-item">
+                                    <div class="item-thumb">
+                                        @if (item.type === 'video') {
+                                            <video [src]="item.url" class="thumb-img"></video>
+                                            <span class="material-symbols-outlined play-icon">play_circle</span>
+                                        } @else {
+                                            <img [src]="item.url" class="thumb-img">
+                                        }
+                                    </div>
+
+                                    <div class="item-info">
+                                        <span class="item-title">{{ item.title || 'Başlıksız' }}</span>
+                                        <span class="item-sub">{{ item.subtitle || 'Açıklama yok' }}</span>
+                                    </div>
+
+                                    <button (click)="deleteMedia(item.id)" class="btn-icon delete" title="Sil">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
+                                </div>
+                            }
+                            
+                            @if (showcaseItems.length === 0) {
+                                <div class="empty-list">
+                                    <p>Henüz vitrin görseli eklenmedi.</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                </div>
+            }
+
+            <div class="card-footer">
+                <button (click)="saveSettings()" class="btn-primary">
+                    Değişiklikleri Kaydet
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>

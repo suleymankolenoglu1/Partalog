@@ -1,0 +1,91 @@
+<div class="relative flex min-h-[calc(100vh-80px)] w-full flex-col items-center justify-center p-4 bg-background-light dark:bg-background-dark">
+    
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-[30%] -right-[10%] w-[70%] h-[70%] rounded-full bg-primary/5 blur-3xl"></div>
+        <div class="absolute top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-primary/10 blur-3xl"></div>
+    </div>
+
+    <a routerLink="/" class="absolute top-8 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+        <div class="size-8 text-primary">
+            <svg fill="currentColor" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path clip-rule="evenodd" d="M47.2426 24L24 47.2426L0.757355 24L24 0.757355L47.2426 24ZM12.2426 21H35.7574L24 9.24264L12.2426 21Z" fill-rule="evenodd"></path>
+            </svg>
+        </div>
+        <span class="text-2xl font-bold text-text-dark dark:text-text-light">Katalogcu</span>
+    </a>
+
+    <div class="relative z-10 w-full max-w-md rounded-xl bg-surface-light dark:bg-surface-dark p-8 shadow-lg border border-border-light dark:border-border-dark">
+        <div class="flex flex-col items-center">
+            <h1 class="text-3xl font-bold tracking-tight text-text-dark dark:text-text-light mb-2">Kayıt Ol</h1>
+            <p class="text-text-muted-light dark:text-text-muted-dark mb-8 text-center">Hemen ücretsiz hesabınızı oluşturun.</p>
+            
+            <form (ngSubmit)="onRegister()" class="w-full">
+                
+                <div class="mb-4 w-full">
+                    <label class="mb-2 block text-sm font-medium text-text-dark dark:text-text-light" for="fullname">Ad Soyad</label>
+                    <input [(ngModel)]="fullName" name="fullName" class="w-full h-12 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark p-3 text-sm text-text-dark dark:text-text-light placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="fullname" placeholder="Adınız Soyadınız" type="text" autocomplete="name"/>
+                </div>
+
+                <div class="mb-4 w-full">
+                    <label class="mb-2 block text-sm font-medium text-text-dark dark:text-text-light" for="email">E-posta Adresi</label>
+                    <input [(ngModel)]="email" name="email" class="w-full h-12 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark p-3 text-sm text-text-dark dark:text-text-light placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="email" placeholder="ornek@katalogcu.com" type="email" autocomplete="email"/>
+                </div>
+
+                <div class="mb-4 w-full">
+                    <label class="mb-2 block text-sm font-medium text-text-dark dark:text-text-light" for="password">Şifre</label>
+                    <div class="relative flex w-full items-center">
+                        <input [(ngModel)]="password" name="password" [type]="showPassword ? 'text' : 'password'" class="w-full h-12 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark p-3 pr-10 text-sm text-text-dark dark:text-text-light placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="password" placeholder="En az 8 karakter" autocomplete="new-password"/>
+                        <button type="button" (click)="togglePassword()" class="absolute inset-y-0 right-0 flex items-center pr-3 text-text-muted-light dark:text-text-muted-dark hover:text-primary transition-colors">
+                            <span class="material-symbols-outlined text-[20px]">
+                                {{ showPassword ? 'visibility_off' : 'visibility' }}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6 flex w-full items-center gap-2">
+                    <input [(ngModel)]="termsAccepted" name="terms" type="checkbox" id="terms" class="w-4 h-4 rounded border-border-light dark:border-border-dark text-primary focus:ring-primary bg-background-light dark:bg-background-dark">
+                    <label for="terms" class="text-sm text-text-muted-light dark:text-text-muted-dark select-none cursor-pointer">
+                        <span class="text-primary hover:underline">Kullanım Koşullarını</span> kabul ediyorum.
+                    </label>
+                </div>
+
+                @if (errorMessage) {
+                    <div class="mb-4 w-full p-3 bg-red-100 border border-red-200 text-red-700 text-sm rounded-lg text-center">
+                        {{ errorMessage }}
+                    </div>
+                }
+
+                <button type="submit" 
+                        [disabled]="isLoading"
+                        class="flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-base font-bold text-background-dark transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+                    @if (isLoading) {
+                        <span class="material-symbols-outlined animate-spin mr-2 text-[20px]">sync</span>
+                        Kaydediliyor...
+                    } @else {
+                        Hesap Oluştur
+                    }
+                </button>
+            </form>
+            <div class="relative my-8 flex w-full items-center justify-center">
+                <div class="absolute w-full border-t border-border-light dark:border-border-dark"></div>
+                <span class="relative z-10 bg-surface-light dark:bg-surface-dark px-3 text-sm text-text-muted-light dark:text-text-muted-dark">Veya şununla kayıt ol</span>
+            </div>
+
+            <div class="flex w-full gap-4">
+                <button class="flex h-12 flex-1 items-center justify-center rounded-lg border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark transition-colors hover:bg-background-light dark:hover:bg-background-dark hover:border-primary/30">
+                    <img alt="Google" class="h-5 w-5" src="https://www.svgrepo.com/show/475656/google-color.svg"/>
+                </button>
+                <button class="flex h-12 flex-1 items-center justify-center rounded-lg border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark transition-colors hover:bg-background-light dark:hover:bg-background-dark hover:border-primary/30">
+                    <img alt="LinkedIn" class="h-5 w-5" src="https://www.svgrepo.com/show/448234/linkedin.svg"/>
+                </button>
+            </div>
+
+            <div class="mt-8 text-center">
+                <p class="text-sm text-text-muted-light dark:text-text-muted-dark">
+                    Zaten hesabınız var mı? <a routerLink="/login" class="font-bold text-primary hover:underline cursor-pointer">Giriş Yapın</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
