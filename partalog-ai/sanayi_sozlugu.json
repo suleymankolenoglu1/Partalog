@@ -864,5 +864,26 @@
     "SCREW(M4-0.7 × 2.5)": [
         "M4 vida",
         "Dörtlük vida"
+    ],
+    "WOOD SCREW($ 5.1 × 20)": [
+        "Vida (5'lik)",
+        "Sunta Vidası"
+    ],
+    "CONNECTOR($ 4-PT1/8)": [
+        "Rakoru (4'lük)"
+    ],
+    "CONNECTOR($6-PT1/4)": [
+        "Rakoru (6'lık)"
+    ],
+    "CORD CLAMP(6N- $ 10.6)": [
+        "Kablo Mengene",
+        "Kordon Kelepçesi"
+    ],
+    "ELBOW CONNECTOR (Ø 4-PT1/8)": [
+        "Dirsek Rakoru (4'lük)"
+    ],
+    "INTERMEDIATE CABLE (UT-A44/CS, UT-A44/ST2-A/CS)": [
+        "Ara Kablo",
+        "Kablo (UT-A44)"
     ]
 }
