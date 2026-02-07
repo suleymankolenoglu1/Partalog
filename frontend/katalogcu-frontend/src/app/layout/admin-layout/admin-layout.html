@@ -41,7 +41,7 @@
             </a>
 
             <div class="store-card-wrapper">
-                <a routerLink="/public-view" target="_blank" class="store-card">
+                <a [routerLink]="['/public-view', userId]" target="_blank" class="store-card">
                     <div class="store-icon-box">
                         <span class="material-symbols-outlined store-icon">storefront</span>
                     </div>

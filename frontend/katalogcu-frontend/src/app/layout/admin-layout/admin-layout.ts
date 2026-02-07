@@ -15,6 +15,7 @@ export class AdminLayoutComponent {
   private authService = inject(AuthService);
 
   isSidebarOpen = true;
+  userId = this.authService.getUserId();
 
   // HTML'deki (click)="logout()" olayının çağırdığı fonksiyon
   logout() {

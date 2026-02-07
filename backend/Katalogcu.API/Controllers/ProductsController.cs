@@ -30,6 +30,14 @@ namespace Katalogcu.API.Controllers
             return Guid.Empty;
         }
 
+        private Guid ResolveUserId(Guid? userId)
+        {
+            var tokenUserId = GetCurrentUserId();
+            if (tokenUserId != Guid.Empty) return tokenUserId;
+            if (userId.HasValue && userId.Value != Guid.Empty) return userId.Value;
+            return Guid.Empty;
+        }
+
         // 1. TÜM ÜRÜNLERİ GETİR (SADECE BENİM OLANLAR)
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -62,10 +70,14 @@ namespace Katalogcu.API.Controllers
         // 2. KATALOĞA GÖRE GETİR (Vitrin için açık bırakıldı)
         [AllowAnonymous]
         [HttpGet("catalog/{catalogId}")]
-        public async Task<IActionResult> GetByCatalog(Guid catalogId)
+        public async Task<IActionResult> GetByCatalog(Guid catalogId, [FromQuery] Guid? userId)
         {
+            var resolvedUserId = ResolveUserId(userId);
+            if (resolvedUserId == Guid.Empty) return BadRequest("Kullanıcı bilgisi bulunamadı.");
+
             var products = await _context.Products
-                                         .Where(p => p.CatalogId == catalogId)
+                                         .Include(p => p.Catalog)
+                                         .Where(p => p.CatalogId == catalogId && p.Catalog.UserId == resolvedUserId)
                                          .OrderBy(p => p.Code)
                                          .ToListAsync();
             return Ok(products);

@@ -32,9 +32,9 @@ export const routes: Routes = [
   { path: '', component: HomeComponent },
   
   // 1. Katalog Listesi (Arama Ekranı)
-  { path: 'public-view', component: PublicViewComponent },
+  { path: 'public-view/:userId', component: PublicViewComponent },
   
-  // 2. Katalog Vitrini (Kutu kutu gruplar) - ESKİ DETAY SAYFASI YERİNE BU AÇILACAK
+  // 2. Katalog Vitrini (Kutu kutu gruplar)
   { path: 'view/:id', component: PublicCatalogShowcaseComponent },
 
   // 3. Profesyonel Görüntüleyici (Teknik Resim & Tablo)
@@ -47,8 +47,6 @@ export const routes: Routes = [
   { path: 'prices', component: PricesComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
-  
-
   
   // --- ADMIN PANELİ ---
   {

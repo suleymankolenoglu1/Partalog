@@ -158,9 +158,9 @@ export class CatalogService {
     return this.http.get<Catalog[]>(`${this.apiUrl}/catalogs`);
   }
 
-  // 🔥 EKLENEN KISIM: Public View için (Yetki istemez)
-  getPublicCatalogs(): Observable<Catalog[]> {
-    return this.http.get<Catalog[]>(`${this.apiUrl}/catalogs/public`);
+  // 🔥 Public View (Kullanıcıya özel)
+  getPublicCatalogsByUser(userId: string): Observable<Catalog[]> {
+    return this.http.get<Catalog[]>(`${this.apiUrl}/catalogs/public/${userId}`);
   }
 
   getCatalogById(id: string): Observable<Catalog> {

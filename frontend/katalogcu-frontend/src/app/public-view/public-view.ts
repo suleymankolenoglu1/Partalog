@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { CatalogService, Catalog } from '../core/services/catalog.service';
 import { CartService } from '../core/services/cart.service';
 import { AiService } from '../core/services/ai.service'; 
@@ -25,6 +25,7 @@ export class PublicViewComponent implements OnInit {
   public cartService = inject(CartService); 
   private aiService = inject(AiService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   // --- UI Durum Yönetimi ---
   searchText: string = '';
@@ -50,15 +51,23 @@ export class PublicViewComponent implements OnInit {
 
   // --- Veri Havuzu ---
   visibleCatalogs: Catalog[] = [];
+  userId: string | null = null;
 
   ngOnInit() {
-    this.loadPublicData();
+    this.userId = this.route.snapshot.paramMap.get('userId');
+    if (!this.userId) {
+      console.error('UserId bulunamadı.');
+      this.isLoading = false;
+      return;
+    }
+
+    this.loadPublicData(this.userId);
   }
 
-  loadPublicData() {
+  loadPublicData(userId: string) {
     this.isLoading = true;
 
-    this.catalogService.getPublicCatalogs().subscribe({
+    this.catalogService.getPublicCatalogsByUser(userId).subscribe({
         next: (catalogs) => {
             this.visibleCatalogs = catalogs; 
             
@@ -117,31 +126,27 @@ export class PublicViewComponent implements OnInit {
   startAiSearch() {
     if (!this.searchText && !this.selectedImage) return;
 
-    // UI Durumunu Hazırla
     this.aiState.isActive = true;
     this.aiState.isLoading = true;
     this.aiState.response = null;
 
-    // A. Kullanıcı mesajını geçmişe ekle
     this.chatHistory.push({ role: 'user', content: this.searchText || '(Resim Gönderildi)' });
 
-    // B. GERÇEK İSTEK
-    this.aiService.sendMessage(this.searchText, this.selectedImage, this.chatHistory).subscribe({
+    this.aiService.sendMessage(
+      this.searchText, 
+      this.selectedImage, 
+      this.chatHistory, 
+      this.userId || undefined
+    ).subscribe({
       next: (res: any) => { 
         this.aiState.isLoading = false;
         
-        // 🔥 Backend Yanıtını HTML Yapısına Eşle
-        // ChatController'dan dönen JSON: { replySuggestion: "...", products: [...], debugInfo: "..." }
-        
         this.aiState.response = {
-          // HTML: {{ aiState.response.replySuggestion }}
           replySuggestion: res.replySuggestion || "Sonuçlar aşağıdadır:", 
-          
-          // HTML: @for(part of aiState.response.products)
           products: (res.products || []).map((part: any) => ({
             id: part.id,
-            code: part.code,      // Backend artık direkt 'code' dönüyor
-            name: part.name,      // Backend artık direkt 'name' dönüyor
+            code: part.code,
+            name: part.name,
             description: part.description, 
             catalogId: part.catalogId, 
             pageNumber: part.pageNumber || '1',
@@ -149,20 +154,10 @@ export class PublicViewComponent implements OnInit {
             stockStatus: part.stockStatus || 'Stokta Yok', 
             imageUrl: part.imageUrl
           })),
-
-          // HTML: {{ aiState.response.debugInfo }}
           debugInfo: res.debugInfo
         };
 
-        // C. Asistan cevabını geçmişe ekle (History context'i için)
         this.chatHistory.push({ role: 'assistant', content: res.replySuggestion });
-
-        // D. Sadece Inputu temizle (Görsel kalsın mı? Genelde temizlenir)
-        // this.searchText = ''; 
-        // this.selectedImage = null;
-        // this.selectedImagePreview = null;
-        // Not: Kullanıcı tekrar sormak isteyebilir diye görseli hemen silmiyoruz, 
-        // ama temizlemek istersen yukarıdaki satırları aç.
       },
       error: (err) => {
         this.aiState.isLoading = false;
@@ -186,7 +181,6 @@ export class PublicViewComponent implements OnInit {
     
     this.isSubmitting = true;
     
-    // Sepeti Backend'e gönder
     this.cartService.submitOrder(this.customerForm).subscribe({
       next: (res: any) => {
         alert(`Siparişiniz başarıyla alındı! \nSipariş No: ${res.orderNumber}`);
