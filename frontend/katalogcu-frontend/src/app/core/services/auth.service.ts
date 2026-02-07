@@ -1,5 +1,3 @@
-
-
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment.development';
@@ -46,5 +44,18 @@ export class AuthService {
   // Token'ı getir
   getToken(): string | null {
     return localStorage.getItem('auth_token');
+  }
+
+  // ✅ UserId'yi getir
+  getUserId(): string | null {
+    const raw = localStorage.getItem('user_info');
+    if (!raw) return null;
+
+    try {
+      const user = JSON.parse(raw);
+      return user?.id ?? null;
+    } catch {
+      return null;
+    }
   }
 }

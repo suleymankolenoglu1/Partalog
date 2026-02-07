@@ -46,18 +46,44 @@ namespace Katalogcu.API.Controllers
             return Guid.Empty;
         }
 
+        private Guid ResolveUserId(Guid? userId)
+        {
+            var tokenUserId = GetCurrentUserId();
+            if (tokenUserId != Guid.Empty) return tokenUserId;
+            if (userId.HasValue && userId.Value != Guid.Empty) return userId.Value;
+            return Guid.Empty;
+        }
+
         // ==========================================
-        // 🌍 YENİ: PUBLIC VIEW (HERKESE AÇIK LİSTE)
+        // 🌍 PUBLIC VIEW (HERKESE AÇIK LİSTE)
         // ==========================================
-        // Bu metod, giriş yapmamış kullanıcıların anasayfada katalogları görmesini sağlar.
         [AllowAnonymous] 
         [HttpGet("public")] 
         public async Task<IActionResult> GetPublicCatalogs()
         {
             var catalogs = await _context.Catalogs
                 .AsNoTracking()
-                .Where(c => c.Status == "Published") // Sadece 'Yayınlandı' olanları getir
-                .Include(c => c.Pages.OrderBy(p => p.PageNumber).Take(1)) // Kapak resmi için ilk sayfayı al
+                .Where(c => c.Status == "Published")
+                .Include(c => c.Pages.OrderBy(p => p.PageNumber).Take(1))
+                .OrderByDescending(c => c.CreatedDate)
+                .ToListAsync();
+
+            return Ok(catalogs);
+        }
+
+        // ==========================================
+        // 🌍 PUBLIC VIEW (KULLANICIYA ÖZEL)
+        // ==========================================
+        [AllowAnonymous]
+        [HttpGet("public/{userId:guid}")]
+        public async Task<IActionResult> GetPublicCatalogsByUser(Guid userId)
+        {
+            if (userId == Guid.Empty) return BadRequest("Geçersiz kullanıcı.");
+
+            var catalogs = await _context.Catalogs
+                .AsNoTracking()
+                .Where(c => c.Status == "Published" && c.UserId == userId)
+                .Include(c => c.Pages.OrderBy(p => p.PageNumber).Take(1))
                 .OrderByDescending(c => c.CreatedDate)
                 .ToListAsync();
 
@@ -108,7 +134,6 @@ namespace Katalogcu.API.Controllers
             catalog.Status = "Processing";
             await _context.SaveChangesAsync();
 
-            // Arka planda işlemi başlat (Fire-and-Forget)
             _ = Task.Run(async () =>
             {
                 using (var scope = _scopeFactory.CreateScope())
@@ -119,20 +144,16 @@ namespace Katalogcu.API.Controllers
                         var scopedContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                         var scopedAiService = scope.ServiceProvider.GetRequiredService<IPartalogAiService>();
 
-                        // A. Kataloğu İşle (OCR, YOLO)
                         await scopedProcessor.ProcessCatalogAsync(id);
 
-                        // B. Statüyü Güncelle
                         var cat = await scopedContext.Catalogs.FindAsync(id);
                         if (cat != null)
                         {
-                            // 🔥 GÜNCELLEME: İşlem biter bitmez yayına alıyoruz.
-                            cat.Status = "Published"; // Eskisi: "AI_Completed" idi.
+                            cat.Status = "Published";
                             cat.UpdatedDate = DateTime.UtcNow;
                             await scopedContext.SaveChangesAsync();
                         }
 
-                        // C. Python Eğitimi Tetikle (Yeni terimleri öğren)
                         await scopedAiService.TriggerTrainingAsync();
                     }
                     catch (Exception ex)
@@ -165,26 +186,25 @@ namespace Katalogcu.API.Controllers
         // ==========================================
         [AllowAnonymous]
         [HttpGet("{id}/pages/{pageNumber}/items")]
-        public async Task<IActionResult> GetPageItems(Guid id, string pageNumber)
+        public async Task<IActionResult> GetPageItems(Guid id, string pageNumber, [FromQuery] Guid? userId)
         {
+            var resolvedUserId = ResolveUserId(userId);
+            if (resolvedUserId == Guid.Empty) return BadRequest("Kullanıcı bilgisi bulunamadı.");
+
             if (!int.TryParse(pageNumber, out int currentPage)) return BadRequest("Sayfa numarası geçersiz.");
 
-            // Strateji 1: Mevcut Sayfa
-            var catalogItems = await FetchItemsForPage(id, currentPage.ToString());
+            var catalogItems = await FetchItemsForPage(id, currentPage.ToString(), resolvedUserId);
 
-            // Strateji 2: Sonraki Sayfa (Veri yoksa)
-            if (!catalogItems.Any()) catalogItems = await FetchItemsForPage(id, (currentPage + 1).ToString());
-
-            // Strateji 3: Önceki Sayfa (Hala veri yoksa)
-            if (!catalogItems.Any() && currentPage > 1) catalogItems = await FetchItemsForPage(id, (currentPage - 1).ToString());
+            if (!catalogItems.Any()) catalogItems = await FetchItemsForPage(id, (currentPage + 1).ToString(), resolvedUserId);
+            if (!catalogItems.Any() && currentPage > 1) catalogItems = await FetchItemsForPage(id, (currentPage - 1).ToString(), resolvedUserId);
 
             if (!catalogItems.Any()) return Ok(new List<object>());
 
-            // Stok Eşleşmesi
             var itemCodes = catalogItems.Select(ci => ci.PartCode).Distinct().ToList();
             var stockedProducts = await _context.Products
+                .Include(p => p.Catalog)
                 .AsNoTracking()
-                .Where(p => itemCodes.Contains(p.Code))
+                .Where(p => itemCodes.Contains(p.Code) && p.Catalog.UserId == resolvedUserId)
                 .GroupBy(p => p.Code).Select(g => g.First()).ToDictionaryAsync(p => p.Code);
 
             var result = catalogItems.Select(item =>
@@ -195,7 +215,7 @@ namespace Katalogcu.API.Controllers
                 return new
                 {
                     catalogItemId = item.Id,
-                    refNo = item.RefNumber, // 🔥 Güncellendi: RefNumber
+                    refNo = item.RefNumber,
                     partCode = item.PartCode,
                     partName = item.PartName,
                     description = item.Description,
@@ -209,12 +229,13 @@ namespace Katalogcu.API.Controllers
             return Ok(result);
         }
 
-        private async Task<List<CatalogItem>> FetchItemsForPage(Guid catalogId, string pageNum)
+        private async Task<List<CatalogItem>> FetchItemsForPage(Guid catalogId, string pageNum, Guid userId)
         {
             return await _context.CatalogItems
+                .Include(ci => ci.Catalog)
                 .AsNoTracking()
-                .Where(ci => ci.CatalogId == catalogId && ci.PageNumber == pageNum)
-                .OrderBy(ci => ci.RefNumber) // 🔥 Güncellendi: RefNumber
+                .Where(ci => ci.CatalogId == catalogId && ci.PageNumber == pageNum && ci.Catalog.UserId == userId)
+                .OrderBy(ci => ci.RefNumber)
                 .ToListAsync();
         }
 
@@ -251,10 +272,16 @@ namespace Katalogcu.API.Controllers
 
         [AllowAnonymous]
         [HttpGet("{id:guid}")]
-        public async Task<IActionResult> GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid? userId)
         {
-            var catalog = await _context.Catalogs.Include(c => c.Pages.OrderBy(p => p.PageNumber))
-                .ThenInclude(p => p.Hotspots).FirstOrDefaultAsync(c => c.Id == id);
+            var resolvedUserId = ResolveUserId(userId);
+            if (resolvedUserId == Guid.Empty) return BadRequest("Kullanıcı bilgisi bulunamadı.");
+
+            var catalog = await _context.Catalogs
+                .Include(c => c.Pages.OrderBy(p => p.PageNumber))
+                .ThenInclude(p => p.Hotspots)
+                .FirstOrDefaultAsync(c => c.Id == id && c.UserId == resolvedUserId);
+
             if (catalog == null) return NotFound("Katalog bulunamadı.");
             return Ok(catalog);
         }
@@ -306,7 +333,6 @@ namespace Katalogcu.API.Controllers
             var catalog = await _context.Catalogs.FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
             if (catalog == null) return NotFound();
             
-            // 🔥 Status güncellemesi burada yapılıyor
             catalog.Status = "Published";
             catalog.UpdatedDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();

@@ -25,8 +25,9 @@ export class AiService {
    * @param text Kullanıcı mesajı
    * @param image Seçilen resim (opsiyonel)
    * @param history Önceki konuşmalar (bağlam için)
+   * @param userId Public view kullanıcı kimliği
    */
-  sendMessage(text: string, image: File | null, history: any[] = []): Observable<AiChatResponse> {
+  sendMessage(text: string, image: File | null, history: any[] = [], userId?: string): Observable<AiChatResponse> {
     const formData = new FormData();
     
     // 1. Metin (Varsa)
@@ -38,6 +39,9 @@ export class AiService {
     // 3. Sohbet Geçmişi (JSON String olarak gönderiyoruz)
     // Backend tarafında [FromForm] string history olarak karşılanıp deserialize edilecek.
     formData.append('history', JSON.stringify(history));
+
+    // ✅ userId ekle
+    if (userId) formData.append('userId', userId);
 
     return this.http.post<AiChatResponse>(this.apiUrl, formData);
   }

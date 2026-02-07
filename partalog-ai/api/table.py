@@ -19,14 +19,14 @@ from config import settings
 
 router = APIRouter()
 
-# ✅ MODEL: gemini-2.0-flash-lite (Hız ve Maliyet Dostu)
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={settings.GEMINI_API_KEY}"
+# ✅ MODEL: gemini-2.0-flash (Hız ve Maliyet Dostu)
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-:generateContent?key={settings.GEMINI_API_KEY}"
 
 # --- Modeller ---
 class ProductResult(BaseModel):
     ref_number: str = Field(default="0")
     part_code: str
-    part_name: str = Field(default="BİLİNMEYEN PARÇA") # Varsayılan Türkçe
+    part_name: str = Field(default="PARÇA")  # ✅ BİLİNMEYEN PARÇA YOK
     description: str = Field(default="")
     quantity: int = Field(default=1)
     dimensions: Optional[str] = None
@@ -92,7 +92,17 @@ async def extract_metadata(file: UploadFile = File(...)):
                         txt = candidates[0]["content"]["parts"][0]["text"]
                         clean_txt = txt.replace("```json", "").replace("```", "").strip()
                         data = json.loads(clean_txt)
-                        return MetadataResponse(**data)
+
+                        machine_group = data.get("machine_group")
+                        if not machine_group:
+                            machine_group = "General"
+
+                        return MetadataResponse(
+                            machine_model=data.get("machine_model", "Unknown"),
+                            machine_brand=data.get("machine_brand"),
+                            machine_group=machine_group,
+                            catalog_title=data.get("catalog_title", "Unknown Catalog")
+                        )
         
         return MetadataResponse(machine_model="Unknown", catalog_title="Error")
     except Exception as e:
@@ -121,10 +131,8 @@ async def extract_table(
         return _empty_response()
 
     # 🇹🇷 EVRENSEL ÇEVİRİ PROMPTU 🇹🇷
-    # Çince, Japonca, İngilizce fark etmez -> Hedef: TÜRKÇE
-    # 🇹🇷 GÜNCELLENMİŞ "TAM SANAYİ AĞZI" PROMPTU 🇹🇷
     prompt_text = """
-    Analyze this Sewing Machine Parts Catalog page. Extract the table into JSON.
+    You are Sewing Machine expert,Analyze this Sewing Machine Parts Catalog page. Extract the table into JSON.
 
     ROLE: You are an expert Turkish Industrial Sewing Machine Technician (40 years experience).
 
@@ -135,10 +143,14 @@ async def extract_table(
        - ❌ WRONG: "Boğaz Plakası" (Throat Plate) -> ✅ RIGHT: "PLAKA" or "AYNA"
        - ❌ WRONG: "Hareketli Bıçak" (Movable Knife) -> ✅ RIGHT: "HAREKETLİ" (Bıçak zaten anlaşılırsa) or "HAREKETLİ BIÇAK"
 
-    3. **UNIVERSAL INPUT:** - If text is Chinese ("送料牙"), Japanese, or English: Translate to TURKISH JARGON.
+    3. **UNIVERSAL INPUT:** If text is Chinese, Japanese, or English: Translate to TURKISH JARGON.
        - If text is already Turkish: Keep it uppercase.
 
-    4. **JARGON MAPPING (MEMORIZE THIS):**
+    4. **NEVER RETURN UNKNOWN:** part_name MUST always be filled.
+       - If the text is unclear, still infer the most likely Turkish workshop term.
+       - Do NOT output "BİLİNMEYEN PARÇA", "UNKNOWN", or empty.
+
+    5. **JARGON MAPPING (MEMORIZE THIS):**
        - "Feed Dog" / "送料牙" -> "DİŞLİ"
        - "Looper" / "弯针" -> "LÜPER"
        - "Needle Clamp" -> "İĞNE BAĞI"
@@ -196,10 +208,14 @@ async def extract_table(
                                 dims = str(item.get("dimensions") or "").strip()
                                 if dims.lower() in ["null", "none"]: dims = None
 
+                                raw_name = str(item.get("part_name") or "").strip()
+                                if not raw_name:
+                                    raw_name = p_code  # ✅ boşsa part_code yaz
+
                                 products.append(ProductResult(
                                     ref_number=str(item.get("ref_no") or "0"),
                                     part_code=p_code,
-                                    part_name=str(item.get("part_name") or "BİLİNMEYEN PARÇA").upper(), # TÜRKÇE GELİYOR
+                                    part_name=raw_name.upper(),
                                     description=str(item.get("remarks") or "").strip(),
                                     quantity=1,
                                     dimensions=dims

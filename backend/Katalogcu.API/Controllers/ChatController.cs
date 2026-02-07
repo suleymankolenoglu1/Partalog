@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.Text.Json;
+using System.Security.Claims;
 
 namespace Katalogcu.API.Controllers
 {
@@ -26,11 +27,30 @@ namespace Katalogcu.API.Controllers
             _logger = logger;
         }
 
+        private Guid GetCurrentUserId()
+        {
+            var idString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(idString, out var guid)) return guid;
+            return Guid.Empty;
+        }
+
         [HttpPost("ask")]
         public async Task<IActionResult> Ask([FromForm] AiChatRequestWithHistoryDto request)
         {
             try
             {
+                // ✅ Kullanıcı ayrımı: önce JWT, yoksa request.UserId
+                var userId = GetCurrentUserId();
+                if (userId == Guid.Empty && !string.IsNullOrWhiteSpace(request.UserId))
+                {
+                    Guid.TryParse(request.UserId, out userId);
+                }
+
+                if (userId == Guid.Empty)
+                {
+                    return BadRequest("Kullanıcı bilgisi bulunamadı.");
+                }
+
                 // 1. History Parse
                 var chatHistory = new List<ChatMessageDto>();
                 if (!string.IsNullOrEmpty(request.History))
@@ -66,35 +86,32 @@ namespace Katalogcu.API.Controllers
                 // SENARYO A: Python kaynak bulduysa
                 if (aiResponse.Sources != null && aiResponse.Sources.Any())
                 {
-                    finalProducts = await EnrichPythonSourcesAsync(aiResponse.Sources);
+                    finalProducts = await EnrichPythonSourcesAsync(aiResponse.Sources, userId);
                 }
                 // SENARYO B: Python bulamadıysa ama Kod yakaladıysa
                 else if (!string.IsNullOrWhiteSpace(searchTerm) && IsPartNumber(searchTerm))
                 {
-                    var fallbackResults = await SearchByCodeAsync(searchTerm);
-                    finalProducts = await EnrichResultsAsync(fallbackResults);
+                    var fallbackResults = await SearchByCodeAsync(searchTerm, userId);
+                    finalProducts = await EnrichResultsAsync(fallbackResults, userId);
                 }
 
                 // 5. ACİL MÜDAHALE (Kod araması)
                 if (IsPartNumber(request.Text) && finalProducts.Count == 0)
                 {
-                    var directResults = await SearchByCodeAsync(request.Text);
+                    var directResults = await SearchByCodeAsync(request.Text, userId);
                     if (directResults.Any())
                     {
-                        finalProducts = await EnrichResultsAsync(directResults);
+                        finalProducts = await EnrichResultsAsync(directResults, userId);
                         aiResponse.Answer = $"Aradığınız {request.Text} kodlu ürün için veritabanında {finalProducts.Count} sonuç buldum.";
                     }
                 }
 
                 // 🔥 6. AI CEVABINI DÜZELTME (OVERRIDE - V2: ESTETİK AMELİYAT) 🔥
-                // AI "Unknown Part" derse, bütün cümleyi silmek yerine sadece o kelimeyi değiştiriyoruz.
-                // Böylece AI'nın yaptığı "Teknik Açıklama" (Description) kaybolmuyor.
                 if (!string.IsNullOrEmpty(aiResponse.Answer) && finalProducts.Any())
                 {
                     var bestMatch = finalProducts.First();
                     var bestName = bestMatch.Name;
 
-                    // AI'nın kullanabileceği "Bilinmiyor" ifadeleri
                     var badPhrases = new[] { "Unknown Part", "Belirtilmemiş Parça", "İsimsiz Parça", "Bilinmeyen Parça", "İsimsiz" };
                     bool correctionMade = false;
 
@@ -102,19 +119,16 @@ namespace Katalogcu.API.Controllers
                     {
                         if (aiResponse.Answer.Contains(phrase, StringComparison.OrdinalIgnoreCase))
                         {
-                            // Kelimeyi bul ve DOĞRUSUYLA değiştir (Replace)
                             aiResponse.Answer = aiResponse.Answer.Replace(phrase, bestName, StringComparison.OrdinalIgnoreCase);
                             correctionMade = true;
                         }
                     }
 
-                    // Eğer düzeltme yaptıysak, parça kodunun cümlenin başında olduğundan emin olalım
                     if (correctionMade && !aiResponse.Answer.Contains(bestMatch.Code))
                     {
                         aiResponse.Answer = $"{bestMatch.Code} - {aiResponse.Answer}";
                     }
 
-                    // Eğer "Replace" işe yaramadıysa (cümle yapısı farklıysa) ama hala "Unknown" diyorsa, mecbur ezip geçiyoruz (Fallback)
                     if (!correctionMade && (aiResponse.Answer.Contains("Unknown Part") || aiResponse.Answer.Contains("Belirtilmemiş")))
                     {
                         aiResponse.Answer = $"Aradığınız parça {bestMatch.Code} - {bestMatch.Name}, {bestMatch.Model ?? "ilgili"} makinesi içindir.";
@@ -138,17 +152,25 @@ namespace Katalogcu.API.Controllers
 
         // --- YARDIMCI METODLAR ---
 
-        private async Task<List<EnrichedPartResult>> EnrichPythonSourcesAsync(List<ChatSourceDto> sources)
+        private async Task<List<EnrichedPartResult>> EnrichPythonSourcesAsync(List<ChatSourceDto> sources, Guid userId)
         {
             var codes = sources.Where(s => !string.IsNullOrEmpty(s.Code)).Select(s => s.Code).Distinct().ToList();
             if (!codes.Any()) return new();
 
-            var products = await _context.Products.AsNoTracking().Where(p => codes.Contains(p.Code)).ToListAsync();
+            var products = await _context.Products
+                .Include(p => p.Catalog)
+                .AsNoTracking()
+                .Where(p => codes.Contains(p.Code) && p.Catalog.UserId == userId)
+                .ToListAsync();
+
             var productDict = products.GroupBy(p => p.Code).ToDictionary(g => g.Key, g => g.First());
 
-            var catalogItems = await _context.CatalogItems.AsNoTracking().Where(ci => codes.Contains(ci.PartCode)).ToListAsync();
+            var catalogItems = await _context.CatalogItems
+                .Include(ci => ci.Catalog)
+                .AsNoTracking()
+                .Where(ci => codes.Contains(ci.PartCode) && ci.Catalog.UserId == userId)
+                .ToListAsync();
 
-            // 🔥 DUPLICATE ÇÖZÜCÜ (BEST RECORD SELECTION) 🔥
             var itemDict = catalogItems
                 .GroupBy(ci => ci.PartCode)
                 .ToDictionary(g => g.Key, g => g
@@ -187,30 +209,42 @@ namespace Katalogcu.API.Controllers
             return enrichedList;
         }
 
-        private async Task<List<CatalogItem>> SearchByCodeAsync(string? term)
+        private async Task<List<CatalogItem>> SearchByCodeAsync(string? term, Guid userId)
         {
             if (string.IsNullOrWhiteSpace(term)) return new List<CatalogItem>();
             var code = term.Trim().ToUpperInvariant();
+
             return await _context.CatalogItems
                 .Include(ci => ci.Catalog)
                 .AsNoTracking()
-                .Where(ci => ci.RefNumber == code || ci.PartCode == code || ci.PartCode.StartsWith(code))
+                .Where(ci =>
+                    ci.Catalog.UserId == userId &&
+                    (ci.RefNumber == code || ci.PartCode == code || ci.PartCode.StartsWith(code)))
                 .OrderBy(ci => ci.PartCode.Length)
                 .Take(5)
                 .ToListAsync();
         }
 
-        private async Task<List<EnrichedPartResult>> EnrichResultsAsync(List<CatalogItem> items)
+        private async Task<List<EnrichedPartResult>> EnrichResultsAsync(List<CatalogItem> items, Guid userId)
         {
             if (items.Count == 0) return new();
 
             var codes = items.Select(i => i.PartCode).Distinct().ToList();
-            var products = await _context.Products.AsNoTracking().Where(p => codes.Contains(p.Code)).ToListAsync();
+
+            var products = await _context.Products
+                .Include(p => p.Catalog)
+                .AsNoTracking()
+                .Where(p => codes.Contains(p.Code) && p.Catalog.UserId == userId)
+                .ToListAsync();
+
             var productDict = products.GroupBy(p => p.Code).ToDictionary(g => g.Key, g => g.First());
 
-            var cleanCatalogItems = await _context.CatalogItems.AsNoTracking().Where(ci => codes.Contains(ci.PartCode)).ToListAsync();
+            var cleanCatalogItems = await _context.CatalogItems
+                .Include(ci => ci.Catalog)
+                .AsNoTracking()
+                .Where(ci => codes.Contains(ci.PartCode) && ci.Catalog.UserId == userId)
+                .ToListAsync();
 
-            // 🔥 BEST RECORD SELECTION 🔥
             var bestItemsDict = cleanCatalogItems
                 .GroupBy(ci => ci.PartCode)
                 .ToDictionary(g => g.Key, g => g
@@ -258,6 +292,9 @@ namespace Katalogcu.API.Controllers
         public string? Text { get; set; }
         public IFormFile? Image { get; set; }
         public string? History { get; set; }
+
+        // ✅ Public-view için userId alıyoruz (JWT yoksa buradan gelir)
+        public string? UserId { get; set; }
     }
 
     public record ChatResponseDto
