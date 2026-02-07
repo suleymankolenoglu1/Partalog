@@ -8,13 +8,15 @@ namespace Katalogcu.Domain.Entities
     public class CatalogItem : BaseEntity
     {
         // --- İLİŞKİLER (Navigation Properties) ---
+
+
         
         // Foreign Key
         public Guid CatalogId { get; set; }
 
         // 🔥 EKLENEN KISIM: ChatController'ın erişebilmesi için gerekli nesne referansı
         [ForeignKey("CatalogId")]
-        public virtual Catalog Catalog { get; set; }
+        public virtual Catalog Catalog { get; set; } = null!;
 
         // --- ÖZELLİKLER ---
 
@@ -36,8 +38,17 @@ namespace Katalogcu.Domain.Entities
 
         // Vektör Temsili (Embedding)
        
-        [Column(TypeName = "vector(768)")] 
+        [Column(TypeName = "vector(3072)")] 
         public Pgvector.Vector? Embedding { get; set; }
+
+        public string? MachineModel { get; set; } 
+        public string? MachineBrand { get; set; }
+
+        public string? MachineGroup { get; set; }
+
+        public string? Dimensions { get; set; }
+
+        public string? Mechanism { get; set; }
 
 
         

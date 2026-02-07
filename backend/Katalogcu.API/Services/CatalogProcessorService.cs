@@ -5,19 +5,17 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Net.Http.Headers;
-// using Pgvector; // Çakışma olmasın diye aşağıda tam isim kullanacağız (Pgvector.Vector)
 
 namespace Katalogcu.API.Services;
 
 public class CatalogProcessorService
 {
     private readonly AppDbContext _context;
-    private readonly IPartalogAiService _aiService; // Postacımız
+    private readonly IPartalogAiService _aiService;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<CatalogProcessorService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    // Python API Adresi
     private const string PYTHON_API_URL = "http://localhost:8000";
 
     public CatalogProcessorService(
@@ -40,6 +38,12 @@ public class CatalogProcessorService
 
         var catalog = await _context.Catalogs.FindAsync(catalogId);
         if (catalog == null) return;
+
+        // ✅ Catalog seviyesinden gelen metadata (Catalog'a yazmıyoruz, sadece Item'a aktaracağız)
+        string? machineBrand = null;
+        string? machineModel = null;
+        string machineGroup = "General";
+        string? catalogTitle = null;
 
         var pages = await _context.CatalogPages
             .Where(p => p.CatalogId == catalogId)
@@ -69,7 +73,19 @@ public class CatalogProcessorService
                 // ADIM 0: KAPAK ANALİZİ
                 if (page.PageNumber == 1)
                 {
-                    await AnalyzeCoverPage(client, catalog, fileBytes);
+                    var metadata = await AnalyzeCoverPage(client, fileBytes);
+                    if (metadata != null)
+                    {
+                        machineModel = metadata.MachineModel;
+                        machineBrand = metadata.MachineBrand;
+                        machineGroup = string.IsNullOrWhiteSpace(metadata.MachineGroup) ? "General" : metadata.MachineGroup;
+                        catalogTitle = metadata.CatalogTitle;
+
+                        if (!string.IsNullOrWhiteSpace(machineModel))
+                        {
+                            catalog.Name = $"{machineModel} ({catalogTitle})";
+                        }
+                    }
                 }
 
                 // ADIM 1: SAYFA ANALİZİ
@@ -97,10 +113,16 @@ public class CatalogProcessorService
                                 RefNumber = item.RefNumber,
                                 PartCode = item.PartCode ?? "",   
                                 PartName = item.PartName ?? "",   
-                                Description = item.Description ?? "" 
+                                Description = item.Description ?? "",
+
+                                // ✅ Yeni alanlar (CatalogItem tablosunda var)
+                                MachineBrand = machineBrand,
+                                MachineModel = machineModel,
+                                MachineGroup = machineGroup,
+                                Mechanism = analysis.Title,
+                                Dimensions = item.Dimensions
                             };
 
-                            // --- 🧠 VEKTÖR KISMI ---
                             string textToEmbed = $"{item.PartName} {item.Description} {item.PartCode}".Trim();
                             if (!string.IsNullOrEmpty(textToEmbed))
                             {
@@ -110,7 +132,6 @@ public class CatalogProcessorService
                                     catalogItem.Embedding = new Pgvector.Vector(vectorData);
                                 }
                             }
-                            // -----------------------
 
                             _context.CatalogItems.Add(catalogItem);
                         }
@@ -147,12 +168,9 @@ public class CatalogProcessorService
 
         _logger.LogInformation($"🏁 Katalog İşlemi Tamamlandı: {catalog.Name}");
 
-        // 👇👇👇 YENİ EKLENEN KISIM: EĞİTİMİ TETİKLE 👇👇👇
         try
         {
             _logger.LogInformation("🚂 Python'a eğitim emri gönderiliyor...");
-            // Python'daki /api/admin/train endpoint'ine boş bir POST atıyoruz.
-            // Fire-and-forget (cevap beklememize gerek yok, arka planda yapsın).
             await client.PostAsync($"{PYTHON_API_URL}/api/admin/train", null);
             _logger.LogInformation("✅ Eğitim isteği gönderildi.");
         }
@@ -160,26 +178,26 @@ public class CatalogProcessorService
         {
             _logger.LogWarning($"⚠️ Eğitim tetiklenemedi (Sorun değil, sonraki katalogda öğrenir): {ex.Message}");
         }
-        // 👆👆👆 --------------------------------------- 👆👆👆
     }
 
-    // --- YARDIMCI METODLAR (Aynı) ---
-    private async Task AnalyzeCoverPage(HttpClient client, Catalog catalog, byte[] fileBytes)
+    private async Task<MetadataResponse?> AnalyzeCoverPage(HttpClient client, byte[] fileBytes)
     {
         try
         {
             using var content = new MultipartFormDataContent();
             content.Add(new ByteArrayContent(fileBytes), "file", "cover.jpg");
+
             var response = await client.PostAsync($"{PYTHON_API_URL}/api/table/extract-metadata", content);
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                var metadata = JsonSerializer.Deserialize<MetadataResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (metadata != null && !string.IsNullOrEmpty(metadata.MachineModel))
-                    catalog.Name = $"{metadata.MachineModel} ({metadata.CatalogTitle})";
-            }
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<MetadataResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
-        catch (Exception ex) { _logger.LogError($"Kapak hatası: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Kapak hatası: {ex.Message}");
+            return null;
+        }
     }
 
     private IFormFile CreateFormFile(Stream stream, string fullPath)
@@ -203,6 +221,8 @@ public class CatalogProcessorService
 
 public class MetadataResponse
 {
-    [JsonPropertyName("machine_model")] public string MachineModel { get; set; }
-    [JsonPropertyName("catalog_title")] public string CatalogTitle { get; set; }
+    [JsonPropertyName("machine_model")] public string? MachineModel { get; set; }
+    [JsonPropertyName("machine_brand")] public string? MachineBrand { get; set; }
+    [JsonPropertyName("machine_group")] public string? MachineGroup { get; set; }
+    [JsonPropertyName("catalog_title")] public string? CatalogTitle { get; set; }
 }

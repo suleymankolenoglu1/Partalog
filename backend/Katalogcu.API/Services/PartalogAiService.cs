@@ -294,20 +294,16 @@ public class ChatMessageDto
 // 🔥 Python'dan gelen JSON yapısına tam uygun DTO
 public class AiChatResponseDto
 {
-    // Python'dan gelen "answer" (Sohbet metni)
     [JsonPropertyName("answer")]
     public string? Answer { get; set; }
 
-    // Python'dan gelen "sources" (Parça listesi)
     [JsonPropertyName("sources")]
     public List<ChatSourceDto>? Sources { get; set; }
 
-    // Debug amaçlı (Opsiyonel)
     [JsonPropertyName("debug_intent")]
     public object? DebugIntent { get; set; }
 }
 
-// Parça listesi içindeki her bir öğe
 public class ChatSourceDto
 {
     [JsonPropertyName("code")]
@@ -345,4 +341,5 @@ public class ProductItemDto
     [JsonPropertyName("part_name")] public string? PartName { get; set; }
     [JsonPropertyName("description")] public string? Description { get; set; }
     [JsonPropertyName("quantity")] public int Quantity { get; set; }
+    [JsonPropertyName("dimensions")] public string? Dimensions { get; set; }
 }

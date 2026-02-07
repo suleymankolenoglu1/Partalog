@@ -1,10 +1,10 @@
 """
-Partalog AI Service - Ana Uygulama (Final v2.4 - Service Mode)
+Partalog AI Service - Ana Uygulama (Final v3.0 - Turkish Native & 3072 Vector)
 Görevi: C# Backend için Zeka Servislerini (YOLO, OCR, Gemini, Embedding) sunmak.
 """
 
 # --- 1. Standart Kütüphaneler ---
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -18,25 +18,18 @@ import time
 # --- 2. Ayarlar ---
 from config import settings
 
-# --- 3. Çekirdek Yapay Zeka Modülleri ---
-from core.ai_engine import GeminiTableExtractor
-from core.dependencies import set_ai_engine 
-from services.embedding import get_text_embedding # 🧠 C# için Vektör Servisi
+# --- 3. Servisler ---
+# services/embedding.py -> Senin sisteminde 3072 boyutlu vektör üretiyor.
+from services.embedding import get_text_embedding 
 
 # --- 4. API Routerları (Uç Noktalar) ---
-from api.hotspot import router as hotspot_router  # YOLO & OCR
-from api.table import router as table_router      # Gemini Tablo Okuma
+# Buradaki api.chat modülü artık 'services.vector_db' kullanıyor (database hatası yok)
+from api.hotspot import router as hotspot_router   # YOLO & OCR
+from api.table import router as table_router       # Gemini Tablo Okuma
 from api.analysis import router as analysis_router # Sayfa Sınıflandırma
-from api.chat import router as chat_router        # Chatbot (Veritabanı Okur)
+from api.chat import router as chat_router         # Chatbot (Türkçe & 3072 Uyumlu)
 
-# --- 5. Eğitim Modülü (Hata Önleyici ile) ---
-try:
-    import train_dictionary
-except ImportError:
-    logger.warning("⚠️ 'train_dictionary.py' bulunamadı veya hatalı. Eğitim çalışmayabilir.")
-    train_dictionary = None
-
-# --- 6. Gelişmiş Loglama Ayarı ---
+# --- 5. Gelişmiş Loglama Ayarı ---
 logger.remove()
 logger.add(
     sys.stdout,
@@ -45,8 +38,7 @@ logger.add(
     colorize=True
 )
 
-# --- 7. Model Başlatma (Lifespan) ---
-# Uygulama açılırken modelleri yükler, kapanırken temizler.
+# --- 6. Model Başlatma (Lifespan) ---
 models = {}
 
 @asynccontextmanager
@@ -55,13 +47,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} (Service Mode) BAŞLATILIYOR...")
     logger.info("=" * 60)
     
-    # A. Sözlük Kontrolü
-    if os.path.exists("sanayi_sozlugu.json"):
-        logger.success("🧠 Sanayi Hafızası (Sözlük) yüklü.")
-    else:
-        logger.warning("⚠️ Sanayi sözlüğü henüz yok. C# ilk kataloğu yükleyince oluşacak.")
-
-    # B. YOLO Hotspot Detector Yükle
+    # A. YOLO Hotspot Detector Yükle (Varsa)
     if os.path.exists(settings.YOLO_MODEL_PATH):
         try:
             from core.detector import HotspotDetector
@@ -76,7 +62,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning(f"⚠️ Model dosyası yok: {settings.YOLO_MODEL_PATH}")
     
-    # C. EasyOCR Yükle
+    # B. EasyOCR Yükle
     try:
         from core.ocr import HotspotOCR
         models["ocr"] = HotspotOCR(use_gpu=settings.OCR_USE_GPU)
@@ -84,102 +70,82 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ EasyOCR Hatası: {e}")
     
-    # D. Gemini Motorunu Hazırla
-    try:
-        gemini_engine = GeminiTableExtractor()
-        set_ai_engine(gemini_engine) 
-        logger.success("✅ Gemini AI Motoru Bağlandı.")
-    except Exception as e:
-        logger.critical(f"❌ Gemini Bağlantı Hatası: {e}")
-    
     logger.info(f"📍 Servis Yayında: http://{settings.HOST}:{settings.PORT}")
     yield
     # Kapanış
     logger.info("👋 Servis durduruluyor, modeller temizleniyor...")
     models.clear()
 
-# --- 8. Uygulama Tanımı ---
+# --- 7. Uygulama Tanımı ---
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="C# Backend için Yardımcı Zeka Servisi",
+    description="C# Backend için Yardımcı Zeka Servisi (3072 Vector Edition)",
     lifespan=lifespan
 )
 
-# --- 9. CORS (Güvenlik İzinleri) ---
+# --- 8. CORS (Güvenlik İzinleri) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Geliştirme ortamı için herkese izin ver
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- 10. Statik Dosyalar ---
+# --- 9. Statik Dosyalar ---
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- 11. Router Bağlantıları ---
+# --- 10. Router Bağlantıları ---
 app.include_router(analysis_router, prefix="/api/analysis", tags=["1. Analiz"])
 app.include_router(hotspot_router, prefix="/api/hotspot", tags=["2. Hotspot (YOLO)"])
-app.include_router(table_router, prefix="/api/table", tags=["3. Tablo (Gemini)"])
+app.include_router(table_router, prefix="/api/table", tags=["3. Tablo (Gemini Türkçe)"])
 app.include_router(chat_router, prefix="/api/chat", tags=["4. Chatbot"])
 
 # =================================================================
-# 👇 KRİTİK ENDPOINTLER (C# BURALARLA KONUŞACAK)
+# 👇 C# İÇİN YARDIMCI ENDPOINTLER
 # =================================================================
 
-# Model: Embedding İsteği
 class EmbeddingRequest(BaseModel):
     text: str
 
 @app.post("/api/embed", tags=["5. Semantic Search (C# Helper)"])
-async def generate_embedding(req: EmbeddingRequest):
+async def generate_embedding_endpoint(req: EmbeddingRequest):
     """
-    C# Backend bu endpoint'e metin gönderir (örn: "Solenoid Valf").
-    Python, Google API'yi kullanarak bunu 768 boyutlu vektöre çevirir.
+    C# Backend bu endpoint'e metin gönderir.
+    Python, Google API ile vektör döner.
+    DİKKAT: Senin sisteminde bu model 3072 boyutlu çıktı veriyor.
     """
-    start = time.time()
+    start_time = time.time()
     if not req.text or len(req.text.strip()) < 2:
          raise HTTPException(status_code=400, detail="Metin çok kısa veya boş.")
 
-    # Servis dosyasını çağır
-    vector = get_text_embedding(req.text)
-    
-    if not vector:
-        raise HTTPException(status_code=500, detail="Google API'den vektör alınamadı.")
+    try:
+        # services/embedding.py içindeki fonksiyonu çağır
+        vector = get_text_embedding(req.text)
+        
+        if not vector:
+             raise HTTPException(status_code=500, detail="Vektör oluşturulamadı (Google API hatası).")
 
-    process_time = round((time.time() - start) * 1000, 2)
-    logger.info(f"🧠 Vektör oluşturuldu ({process_time}ms): {req.text[:30]}...")
-    
-    return {"embedding": vector}
+        process_time = round((time.time() - start_time) * 1000, 2)
+        
+        # Logda boyutu görelim ki için rahat etsin (3072 bekliyoruz)
+        logger.info(f"🧠 Vektör oluşturuldu ({process_time}ms) Boyut: {len(vector)}")
+        
+        return {"embedding": vector}
 
-
-@app.post("/api/admin/train", tags=["6. Admin & Training"])
-async def trigger_training(background_tasks: BackgroundTasks):
-    """
-    C# veritabanına kaydı bitirince burayı tetikler.
-    Bu kod arka planda 'train_dictionary.py' dosyasını çalıştırır.
-    """
-    if train_dictionary:
-        # Arka planda çalıştır (Fire-and-Forget)
-        background_tasks.add_task(train_dictionary.main)
-        logger.info("🚂 C#'tan eğitim emri geldi. Eğitim başlatılıyor...")
-        return {"status": "started", "message": "Sözlük eğitimi başlatıldı."}
-    else:
-        logger.error("❌ Eğitim modülü yüklenemediği için işlem yapılamadı.")
-        raise HTTPException(status_code=503, detail="Eğitim modülü (train_dictionary) bulunamadı.")
-
-# =================================================================
+    except Exception as e:
+         logger.error(f"❌ Embedding Hatası: {e}")
+         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/", tags=["Health"])
 async def root():
     return {
         "service": settings.APP_NAME,
-        "mode": "Service Mode (Connected to C#)",
+        "mode": "Service Mode (Native Turkish & 3072 Vector)",
         "status": "Active"
     }
 
-# Doğrudan çalıştırma desteği
 if __name__ == "__main__":
     uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
