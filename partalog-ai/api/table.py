@@ -1,6 +1,7 @@
 """
-Table API - Gemini 2.0 Flash (Pure Reader Mode)
-Görevi: Resmi okuyup veriyi C#'a teslim etmek. Veritabanına YAZMAZ.
+Table API - Gemini 2.0 Flash (Industrial Turkish Translation Mode 🇹🇷)
+Görevi: Resmi okur, markayı bulur.
+ÖZELLİK: Kaynak dil ne olursa olsun (Çince, Japonca, İngilizce) veriyi SANAYİ TÜRKÇESİNE çevirir.
 """
 
 import aiohttp
@@ -11,24 +12,24 @@ import asyncio
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Query
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from loguru import logger
 import time
 from config import settings
 
 router = APIRouter()
 
-# ✅ MODEL: gemini-2.0-flash-lite
+# ✅ MODEL: gemini-2.0-flash-lite (Hız ve Maliyet Dostu)
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={settings.GEMINI_API_KEY}"
 
-# --- Modeller (C# Tarafıyla Uyumlu) ---
-
+# --- Modeller ---
 class ProductResult(BaseModel):
     ref_number: str = Field(default="0")
     part_code: str
-    part_name: str = Field(default="Unknown Part")
+    part_name: str = Field(default="BİLİNMEYEN PARÇA") # Varsayılan Türkçe
     description: str = Field(default="")
     quantity: int = Field(default=1)
+    dimensions: Optional[str] = None
 
 class TableResult(BaseModel):
     row_count: int
@@ -44,16 +45,17 @@ class TableExtractionResponse(BaseModel):
 
 class MetadataResponse(BaseModel):
     machine_model: str
+    machine_brand: Optional[str] = None
+    machine_group: str = "General"
     catalog_title: str
 
 # --- Endpoints ---
 
-# A. KAPAK ANALİZİ (C# Kullanıyor)
+# A. KAPAK ANALİZİ (Aynı Kalıyor)
 @router.post("/extract-metadata", response_model=MetadataResponse)
 async def extract_metadata(file: UploadFile = File(...)):
-    """
-    Sadece 1. sayfayı (Kapağı) okur ve Makine Modelini bulur.
-    """
+    logger.info("🔍 [METADATA] Kapak analizi (Zeka Modu) isteği geldi...")
+    
     try:
         content = await file.read()
         image = Image.open(io.BytesIO(content)).convert("RGB")
@@ -62,21 +64,23 @@ async def extract_metadata(file: UploadFile = File(...)):
         image.save(buffered, format="JPEG", quality=90)
         base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+        # Prompt: Marka ve Modeli Bul
         prompt = """
-        Analyze this catalog cover page image.
-        Extract:
-        1. The Main Machine Model Code (e.g., MF-7500, DDL-8700).
-        2. The Catalog Title or List No (e.g., 1611-01).
+        You are an expert industrial sewing machine technician.
+        Analyze this catalog cover image.
+        
+        TASK:
+        1. Identify BRAND (JUKI, PEGASUS, YAMATO, TYPICAL, BROTHER, SIRUBA, JACK etc.)
+        2. Identify MODEL (e.g. MF-7900, GK335)
+        3. Identify MACHINE GROUP (Lockstitch, Overlock, Coverstitch, Chainstitch, Bartack, Buttonhole, General)
 
         Return JSON:
-        {"machine_model": "MF-7500-C11", "catalog_title": "PARTS LIST 1611-01"}
+        { "machine_model": "...", "machine_brand": "...", "machine_group": "...", "catalog_title": "..." }
         """
 
         payload = {
-            "contents": [{
-                "parts": [{"text": prompt}, {"inline_data": {"mime_type": "image/jpeg", "data": base64_image}}]
-            }],
-            "generationConfig": {"response_mime_type": "application/json"}
+            "contents": [{"parts": [{"text": prompt}, {"inline_data": {"mime_type": "image/jpeg", "data": base64_image}}]}],
+            "generationConfig": {"response_mime_type": "application/json", "temperature": 0.3}
         }
 
         async with aiohttp.ClientSession() as session:
@@ -88,30 +92,27 @@ async def extract_metadata(file: UploadFile = File(...)):
                         txt = candidates[0]["content"]["parts"][0]["text"]
                         clean_txt = txt.replace("```json", "").replace("```", "").strip()
                         data = json.loads(clean_txt)
-                        return MetadataResponse(
-                            machine_model=data.get("machine_model", "Unknown"),
-                            catalog_title=data.get("catalog_title", "Unknown Catalog")
-                        )
-        return MetadataResponse(machine_model="Unknown", catalog_title="Unknown")
+                        return MetadataResponse(**data)
+        
+        return MetadataResponse(machine_model="Unknown", catalog_title="Error")
     except Exception as e:
         logger.error(f"Metadata Error: {e}")
         return MetadataResponse(machine_model="Error", catalog_title="Error")
 
 
-# B. TABLO AYIKLAMA (Veritabanı kodu yok, saf okuyucu)
+# B. TABLO AYIKLAMA VE TÜRÇELEŞTİRME (🔥 GÜNCELLENDİ)
 @router.post("/extract", response_model=TableExtractionResponse)
 async def extract_table(
     file: UploadFile = File(...),
     page_number: int = Query(default=1)
 ):
     start_time = time.time()
-    logger.info(f"📄 [GEMINI] Tablo Okunuyor: Sayfa {page_number}")
+    logger.info(f"📄 [GEMINI] Tablo Okunuyor ve Türkçeye Çevriliyor: Sayfa {page_number}")
     
-    # 1. Dosya İşleme
     try:
         content = await file.read()
         image = Image.open(io.BytesIO(content)).convert("RGB")
-        image.thumbnail((1500, 1500))
+        image.thumbnail((1500, 1500)) 
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG", quality=95)
         base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -119,22 +120,49 @@ async def extract_table(
         logger.error(f"❌ Resim hatası: {e}")
         return _empty_response()
 
-    # 2. PROMPT
+    # 🇹🇷 EVRENSEL ÇEVİRİ PROMPTU 🇹🇷
+    # Çince, Japonca, İngilizce fark etmez -> Hedef: TÜRKÇE
+    # 🇹🇷 GÜNCELLENMİŞ "TAM SANAYİ AĞZI" PROMPTU 🇹🇷
     prompt_text = """
     Analyze this Sewing Machine Parts Catalog page. Extract the table into JSON.
 
-    CRITICAL RULES:
-    1. **FIND THE PART NAME:** The Part Name is MANDATORY.
-    2. **REMARKS vs NAME:** If you are unsure, put EVERYTHING in "part_name".
-    3. **ACCURACY:** Part codes must be character-perfect.
-    4. **NO TRANSLATION:** Keep text exactly as in the image (English).
+    ROLE: You are an expert Turkish Industrial Sewing Machine Technician (40 years experience).
 
-    RETURN JSON FORMAT:
-    [
-      {"ref_no": "1", "part_code": "13350301", "part_name": "NEEDLE HEAD", "remarks": "", "qty": "1"}
-    ]
+    🚨 CRITICAL TRANSLATION RULES (STRICT INDUSTRIAL JARGON):
+    1. **TARGET LANGUAGE:** TURKISH (Sanayi Dili).
+    2. **NO LITERAL TRANSLATION:** Never use Google Translate style. Use the terms used in a real workshop (Atölye).
+       - ❌ WRONG: "Besleme Köpeği" (Feed Dog) -> ✅ RIGHT: "DİŞLİ"
+       - ❌ WRONG: "Boğaz Plakası" (Throat Plate) -> ✅ RIGHT: "PLAKA" or "AYNA"
+       - ❌ WRONG: "Hareketli Bıçak" (Movable Knife) -> ✅ RIGHT: "HAREKETLİ" (Bıçak zaten anlaşılırsa) or "HAREKETLİ BIÇAK"
+
+    3. **UNIVERSAL INPUT:** - If text is Chinese ("送料牙"), Japanese, or English: Translate to TURKISH JARGON.
+       - If text is already Turkish: Keep it uppercase.
+
+    4. **JARGON MAPPING (MEMORIZE THIS):**
+       - "Feed Dog" / "送料牙" -> "DİŞLİ"
+       - "Looper" / "弯针" -> "LÜPER"
+       - "Needle Clamp" -> "İĞNE BAĞI"
+       - "Presser Foot" / "压脚" -> "AYAK"
+       - "Thread Take-up" -> "HOROZ"
+       - "Tension Assembly" -> "TANSİYON"
+       - "Bobbin Case" -> "MEKİK"
+       - "Hook" -> "ÇAĞANOZ"
+       - "Screw" -> "VİDA"
+       - "Nut" -> "SOMUN"
+       - "Washer" -> "PUL"
+       - "Crank Shaft" -> "KRANK"
+
+    OUTPUT RULES:
+    1. **FORMAT:** JSON List only.
+    2. **FIELDS:**
+       - "ref_no": Reference number.
+       - "part_code": Exact part code (Remove spaces, fix OCR errors).
+       - "part_name": **THE TRANSLATED TURKISH NAME** (Uppercase).
+       - "dimensions": Extract measurements (M4x10, 3/16, 5mm) to this field.
+       - "qty": Quantity.
+
+    RETURN JSON LIST ONLY. NO MARKDOWN.
     """
-
     payload = {
         "contents": [{
             "parts": [
@@ -142,22 +170,18 @@ async def extract_table(
                 {"inline_data": {"mime_type": "image/jpeg", "data": base64_image}}
             ]
         }],
-        "generationConfig": {"response_mime_type": "application/json"}
+        "generationConfig": {"response_mime_type": "application/json", "temperature": 0.1}
     }
 
-    # 3. İstek At (Retry Mekanizması)
-    max_retries = 3
-    base_delay = 2
     products = []
-
+    
     async with aiohttp.ClientSession() as session:
-        for attempt in range(max_retries):
+        for attempt in range(3): # 3 kere dene
             try:
                 async with session.post(GEMINI_API_URL, json=payload) as response:
                     if response.status == 200:
                         res = await response.json()
-                        if not res.get("candidates"): 
-                            break
+                        if not res.get("candidates"): break
                         
                         txt = res["candidates"][0]["content"]["parts"][0]["text"]
                         clean_txt = txt.replace("```json", "").replace("```", "").strip()
@@ -165,36 +189,33 @@ async def extract_table(
                         
                         try:
                             raw_data = json.loads(clean_txt)
-                            
-                            # JSON Dönüşümü
                             for item in raw_data:
-                                p_code = str(item.get("part_code") or item.get("Part Number") or item.get("code") or "").strip()
-                                if len(p_code) < 2: continue
+                                p_code = str(item.get("part_code") or "0").strip()
+                                if len(p_code) < 3: continue 
+
+                                dims = str(item.get("dimensions") or "").strip()
+                                if dims.lower() in ["null", "none"]: dims = None
 
                                 products.append(ProductResult(
-                                    ref_number=str(item.get("ref_no") or item.get("ref") or "0"),
+                                    ref_number=str(item.get("ref_no") or "0"),
                                     part_code=p_code,
-                                    part_name=str(item.get("part_name") or item.get("description") or "Unknown Part").strip(),
-                                    description=str(item.get("remarks") or item.get("gauge") or "").strip(),
-                                    quantity=1
+                                    part_name=str(item.get("part_name") or "BİLİNMEYEN PARÇA").upper(), # TÜRKÇE GELİYOR
+                                    description=str(item.get("remarks") or "").strip(),
+                                    quantity=1,
+                                    dimensions=dims
                                 ))
-                            logger.success(f"✅ [GEMINI] {len(products)} parça bulundu (Sayfa {page_number})")
-                            break # Başarılıysa döngüden çık
+                            logger.success(f"✅ [GEMINI] {len(products)} parça TÜRKÇELEŞTİRİLDİ (Sayfa {page_number})")
+                            break
                         except:
-                            continue # JSON bozuksa tekrar dene
-
-                    elif response.status in [429, 503]:
-                        await asyncio.sleep(base_delay * (1.5 ** attempt))
-                        continue
+                            continue
                     else:
-                        break
-            except Exception as e:
+                        await asyncio.sleep(1)
+            except Exception:
                 await asyncio.sleep(1)
-                continue
 
     return TableExtractionResponse(
         success=True,
-        message=f"Gemini {len(products)} parça buldu.",
+        message=f"Gemini {len(products)} parçayı Türkçeye çevirip buldu.",
         total_products=len(products),
         tables=[TableResult(row_count=len(products), products=products)],
         page_number=page_number,

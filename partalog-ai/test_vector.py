@@ -1,35 +1,36 @@
-import asyncio
-from services.vector_db import search_parts
-from loguru import logger
+import os
+from dotenv import load_dotenv
+import google.generativeai as genai
 
-# Logları görelim
-logger.remove()
-logger.add(lambda msg: print(msg, end=""), format="{message}", level="INFO")
+# 1. .env dosyasını yükle
+load_dotenv()
 
-async def test():
-    print("\n🔎 TEST 1: 'Lower Knife' araması yapılıyor...")
-    # İngilizce soralım, çünkü veritabanı İngilizce (Semantic search yine de bulmalı)
-    results = await search_parts("Lower Knife", k=10) # Limiti 10 yaptık
-    
-    print(f"\nSonuç Sayısı: {len(results)}")
-    for i, res in enumerate(results):
-        # Benzerlik skoru 1'e ne kadar yakınsa o kadar iyi
-        score = res.get('similarity', 0)
-        name = res.get('name')
-        code = res.get('code')
-        desc = res.get('desc')
-        print(f"{i+1}. [{score:.4f}] {code} - {name} ({desc})")
+# 2. API Key'i "GOOGLE_API_KEY" adıyla al (.env dosyasındaki ismin bu olduğu için)
+raw_api_key = os.getenv("GOOGLE_API_KEY")
 
-    print("\n" + "="*50 + "\n")
+if not raw_api_key:
+    print("❌ HATA: GOOGLE_API_KEY bulunamadı! .env dosyanı kontrol et.")
+    exit()
 
-    print("🔎 TEST 2: 'hareketli bıçak' (Türkçe) araması yapılıyor...")
-    results_tr = await search_parts("hareketli bıçak", k=10)
-    
-    for i, res in enumerate(results_tr):
-        score = res.get('similarity', 0)
-        name = res.get('name')
-        code = res.get('code')
-        print(f"{i+1}. [{score:.4f}] {code} - {name}")
+# 3. TIRNAK TEMİZLİĞİ (Kritik Adım 🛠️)
+# .env dosyasında "AIza..." şeklinde tırnak varsa onları siliyoruz.
+api_key = raw_api_key.replace('"', '').replace("'", '').strip()
 
-if __name__ == "__main__":
-    asyncio.run(test())
+print(f"✅ Key Alındı ve Temizlendi: {api_key[:5]}... (Tırnaksız)")
+
+# 4. Gemini'yi yapılandır
+genai.configure(api_key=api_key)
+
+print("\n--- Müsait Embedding Modelleri ---")
+try:
+    found_models = []
+    for m in genai.list_models():
+        if 'embed' in m.name:
+            print(f"📦 Model: {m.name}")
+            found_models.append(m.name)
+            
+    if not found_models:
+        print("⚠️ Hiçbir embedding modeli bulunamadı. API Key yetkilerini kontrol et.")
+        
+except Exception as e:
+    print(f"🔥 Bir hata oluştu: {e}")

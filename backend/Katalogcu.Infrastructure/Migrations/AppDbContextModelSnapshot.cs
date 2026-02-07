@@ -127,8 +127,23 @@ namespace Katalogcu.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Dimensions")
+                        .HasColumnType("text");
+
                     b.Property<Vector>("Embedding")
-                        .HasColumnType("vector(768)");
+                        .HasColumnType("vector(3072)");
+
+                    b.Property<string>("MachineBrand")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MachineGroup")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MachineModel")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Mechanism")
+                        .HasColumnType("text");
 
                     b.Property<string>("PageNumber")
                         .IsRequired()

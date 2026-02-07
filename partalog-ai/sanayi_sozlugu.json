@@ -1,889 +1,1187 @@
 {
-    "TRIMMING MACHANISM, C. SET": [
-        "Biçak Takımı"
-    ],
-    "COLLAR(9 × 15 × 7.5MM)": [
-        "Kelepçe",
-        "Burç"
-    ],
-    "AIR CYLINDER BRACKET": [
-        "Hava Silindir Braketi",
-        "Pnömatik Braket"
-    ],
-    "SCREW(M4-0.7 × 14)": [
-        "M4 Vida",
-        "Dörtlük Vida"
-    ],
-    "SYNCHRONIZER CUSHION": [
-        "Senkronizasyon Takozu"
-    ],
-    "WIPER HOLDER": [
-        "Silecek Tutucu"
-    ],
-    "SCREW(M6-1 × 15)": [
-        "M6 Vida",
-        "Altılık Vida"
-    ],
-    "SWITCH SUPPORT": [
-        "Şalter Desteği"
-    ],
-    "CLAMP SPRING": [
-        "Kelepçe Yayı"
-    ],
-    "CONNECTING BLOCK(RIGHT)": [
-        "Bağlantı Bloğu (Sağ)",
-        "Klemens Bloğu (Sağ)"
-    ],
-    "SCREW(M4-0.7 X 4)": [
-        "M4 Vida",
-        "Dörtlük Vida"
-    ],
-    "SPEED CONTROLLER": [
-        "Hız Kontrol Cihazı",
-        "Varyatör"
-    ],
-    "SWITCH GUIDE": [
-        "Şalter Kılavuzu"
-    ],
-    "AIR CYLINDER HOLDER": [
-        "Hava Silindir Tutucu",
-        "Pnömatik Silindir Tutucu"
-    ],
-    "SCREW(M6-1 × 20)": [
-        "M6 Vida",
-        "Altılık Vida"
-    ],
-    "TRIMMING DEVICE, COMPLETE SET": [
-        "Biçak Takımı",
-        "Tıraşlama Takımı"
-    ],
-    "SCREW(11/64-40 × 7.5)": [
-        "İnç Vida"
-    ],
-    "UPPER KNIFE CARRIER SPRING": [
-        "Üst Bıçak Taşıyıcı Yayı"
-    ],
-    "SCREW (M4-0.7 × 20)": [
-        "M4 Vida",
-        "Dörtlük Vida"
-    ],
-    "SOLENOID DUST-PROOF COVER": [
-        "Selenoid Toz Kapağı",
-        "Bobin Kapağı"
-    ],
-    "SCREW(M3.5-0.6 × 8)": [
-        "M3.5 Vida"
-    ],
-    "CORD CLAMP(5№- Ф 8.4)": [
-        "Kablo Kelepçesi"
-    ],
-    "TIMING VELT(385-5GT-15)": [
-        "Triger Kayışı",
-        "Zamanlama Kayışı"
-    ],
-    "SWITCH": [
-        "Şalter",
-        "Switch"
-    ],
-    "SOLENOID LEVER CONNECTING BLOCK": [
-        "Selenoid Kol Bağlantı Bloğu",
-        "Bobin Kol Klemensi"
-    ],
-    "ANTI-SHOCK RUBBER": [
-        "Takoz",
-        "Anti Şok Lastiği"
-    ],
-    "UNION Y-CONNECTOR(Φ4)": [
-        "Y Bağlantı",
-        "Y Rakoru"
-    ],
-    "SCREW(M2-0.4 × 10)": [
-        "M2 Vida"
-    ],
-    "CONNECTING BLOCK (RIGHT) SUPPORT SPRING": [
-        "Klemens Bloğu (Sağ) Yay",
-        "Bağlantı Bloğu (Sağ) Destek Yayı"
-    ],
-    "CS DEVICE, C. SET": [
-        "CS Takımı"
-    ],
-    "NUT": [
-        "Somun"
-    ],
-    "TERMINAL HOLDER, COMPLETE SET": [
-        "Klemens Tutucu Takımı"
-    ],
-    "SOLENOID LEVER": [
-        "Selenoid Kolu",
-        "Bobin Kolu"
-    ],
-    "CONNECTING ROD(M5-0.8 × 40)": [
-        "Bağlantı Çubuğu"
-    ],
-    "TERMINAL HOLDER SUPPORT": [
-        "Klemens Tutucu Desteği"
-    ],
-    "BOLT(M3-0.5 × 20.5)": [
-        "M3 Civata",
-        "Üçlük Civata"
-    ],
-    "UPPER KNIFE CARRIER STOPPER": [
-        "Üst Bıçak Taşıyıcı Stoper"
-    ],
-    "HOSE BAND": [
-        "Hortum Kelepçesi"
-    ],
-    "REGULATOR": [
-        "Regülatör",
-        "Basınç Ayarlayıcı"
-    ],
-    "SCREW(M3-0.5 × 2.6)": [
-        "M3 Vida",
-        "Üçlük Vida"
-    ],
-    "SCREW(M3-0.5 × 5)": [
-        "M3 Vida",
-        "Küçük Vida"
-    ],
-    "SCREW (M3-0.5 × 5)": [
-        "M3 Vida",
-        "Küçük Vida"
-    ],
-    "INTERMEDIATE CABLE (UT-A44)": [
-        "Ara Kablo",
-        "İntermediate Kablo"
-    ],
-    "SCREW (M4-0.7 X 8)": [
-        "M4 Vida"
-    ],
-    "CORD CLAMP(2Ν- Φ 3.4)": [
-        "Kablo Mengene",
-        "Kablo Kelepçesi"
-    ],
-    "TOP COVER THREAD EYELET": [
-        "Üst Kapak İplik Gözü"
-    ],
-    "THREAD CLAMP SPRING": [
-        "İplik Sıkıştırma Yayı"
-    ],
-    "SCREW(M4-0.7 × 4)": [
-        "M4 Vida"
-    ],
-    "MINAS INSTALLATION KIT(UT-A44/M, UT-A44/ST2-A/M)": [
-        "Minas Montaj Kiti"
-    ],
-    "PRESSER FOOT LIFTER CYLINDER, C. SET": [
-        "Baskı Ayağı Kaldırma Silindiri"
-    ],
-    "WRAPPING BAND (2.3 × 92)": [
-        "Sargı Bandı"
-    ],
-    "SPRING WASHER": [
-        "Yaylı Pul"
-    ],
-    "TERMINAL HOLDER": [
-        "Klemens Yuvası"
-    ],
-    "SPRING HANGER": [
-        "Yay Askısı"
-    ],
-    "SOLENOID LEVER PIN": [
-        "Selenoid Kol Pimi",
-        "Bobin Mili"
-    ],
-    "SCREW(M4-0.7 × 5)": [
-        "M4 Vida"
-    ],
-    "SCREW (M3-0.5 × 3.5)": [
-        "M3 Vida",
-        "Küçük Vida"
-    ],
-    "CORD CLAMP(4N-6.8) (FOR ST2-A)": [
-        "Kablo Mengene",
-        "Kablo Kelepçesi"
-    ],
-    "GUIDE PLATE": [
-        "Kılavuz Plaka"
-    ],
-    "BLANK PLUG": [
-        "Kör Tapa"
-    ],
-    "KNIFE GUIDE LEVER RING (LEFT)": [
-        "Bıçak Kılavuz Kol Halkası (Sol)"
-    ],
-    "AIR TUBE(4 × 2.5MM) (BLACK)": [
-        "Hava Borusu"
-    ],
-    "SCREW(M4-0.7 × 20)": [
-        "M4 Vida"
-    ],
-    "SILENCER": [
-        "Susturucu"
-    ],
-    "CYLINDER ROD CHIP": [
-        "Silindir Mili Civatası"
-    ],
-    "SCREW(M2-0.4 × 3.5)": [
-        "M2 Vida",
-        "Minik Vida"
-    ],
-    "MOVABLE TRIMMING KNIFE HOLDER": [
-        "Hareketli Traş Bıçağı Tutucusu"
-    ],
-    "SCREW (M4-0.7 × 8)": [
-        "M4 Vida"
-    ],
-    "LIFTER CONNECTING LINK": [
-        "Kaldırıcı Bağlantı Kolu"
-    ],
-    "LOWER KNIFE CARRIER": [
-        "Alt Bıçak Taşıyıcı"
-    ],
-    "TENSION RELEASE BLOCK": [
-        "Gerginlik Bırakma Bloğu"
-    ],
-    "SCREW(M6-1 × 8)": [
-        "M6 Vida",
-        "Büyük Vida"
-    ],
-    "CONNECTOR(Φ 4-PT1/8)": [
-        "Konnektör"
-    ],
-    "POSITIONING PLATE (UPPER)": [
-        "Konumlandırma Plakası (Üst)"
-    ],
-    "SCREW (M4-0.7 × 6)": [
-        "M4 Vida"
-    ],
-    "GASKET": [
-        "Conta"
-    ],
-    "MINAS INSTALLATION KIT(UT-A42/M)": [
-        "Minas Montaj Kiti"
-    ],
-    "WIPER BAR": [
-        "Silecek Çubuğu"
-    ],
-    "SOLENOID VALVE, C. SET": [
-        "Selenoid Valf",
-        "Bobin Valfi"
-    ],
-    "INTERMEDIATE CABLE (UT-A44/ST2-A)": [
-        "Ara Kablo",
-        "İntermediate Kablo"
-    ],
-    "PLUNGER": [
-        "Palanjer"
-    ],
-    "INTERMEDIATE CABLE (UT-A42/CS/M)": [
-        "Ara Kablo"
-    ],
-    "KNIFE GUIDE LEVER": [
-        "Bıçak Kolu",
-        "Bıçağın Kolu"
-    ],
-    "FOLDER(RIGHT)": [
-        "Föyler"
-    ],
-    "SCREW(M4-0.7 × 3)": [
-        "M4 Vida",
-        "Dörtlük Vida"
-    ],
-    "SCREW (M4-0.7 × 5.4)": [
-        "M4 Vida",
-        "Dörtlük Vida"
-    ],
-    "CLAMP SPRING PRESSURE": [
-        "Sıkıştırma Yayı",
-        "Baskı Yayı"
-    ],
-    "WOOD SCREW(Φ 5.1 × 20)": [
-        "Sunta Vidası",
-        "Ağaç Vidası"
-    ],
-    "COLLAR(8 × 16 × 8MM)": [
-        "Kolar"
-    ],
-    "SOLENOID SUPPORT": [
-        "Selenoid Desteği"
-    ],
-    "HANGING BOLT(M8-1.25 × 220)": [
-        "Saplama"
-    ],
-    "SCREW(M4-0.7 × 5.4)": [
-        "M4 Vida",
-        "Dörtlük Vida"
-    ],
-    "SCREW(M5-0.8 × 5)": [
-        "M5 Vida",
-        "Beşlik Vida"
-    ],
-    "WIPER SOLENOID": [
-        "Silecek Selenoidi"
-    ],
-    "LOWER KNIFE CARRIER STOPPER": [
-        "Alt Bıçak Taşıyıcı Stoperi"
-    ],
-    "AIR TUBE (4 × 2.5MM) (BLACK)": [
-        "Hava Hortumu",
-        "Şeffaf Hortum"
-    ],
-    "AIR CYLINDER (MS-16-PD-20)": [
-        "Pnömatik Silindir",
-        "Hava Silindiri"
-    ],
-    "CORD CLAMP(6N- Φ 10.6)": [
-        "Kablo Kelepçesi"
+    "FABRIC_GUIDE": [
+        "Kumaş Kılavuzu",
+        "Kumaş Gezdiren"
+    ],
+    "YIELDING_SECTION_PLATE": [
+        "Esnek Tabla",
+        "Esnek Parça Sacı"
+    ],
+    "PIVOT_PIN": [
+        "Menteşe Pimi",
+        "Dönme Pimi"
+    ],
+    "THROAT_PLATE_SUPPORT_COVER_S": [
+        "İğne Altı Kapağı",
+        "Siperlik Kapağı"
+    ],
+    "PRESSER_FOOT_SHANK": [
+        "Baskı Ayağı Şaftı",
+        "Baskı Ayağı Kolu"
+    ],
+    "SPRING": [
+        "Yay"
+    ],
+    "NEEDLE": [
+        "İğne"
     ],
     "BRACKET": [
         "Braket",
         "Konsol"
     ],
-    "SWITCH COVER": [
-        "Şalter Kapağı",
-        "Şalterin Kapağı"
+    "UNKNOWN": [
+        "Bilinmiyor",
+        "Ne Olduğu Belli Değil"
     ],
-    "CYLINDER JOINT PIN": [
-        "Silindir Pim",
-        "Pim"
+    "PRESSER_FOOT_ASSY": [
+        "Baskı Ayağı Takımı",
+        "Ayağın Takımı"
     ],
-    "SCREW(M4-0.7 × 35)": [
-        "M4 Vida",
-        "Dörtlük Vida"
+    "SCREW": [
+        "Vida"
     ],
-    "SOLENOID COVER": [
-        "Selenoid Kapağı"
+    "PRESSER_FOOT_BOTTOM": [
+        "Baskı Ayağı Altı",
+        "Ayağın Altı"
     ],
-    "SCREWED PIN(M5-0.8 × 6)": [
-        "Pim Vidası"
+    "SPRING PIN": [
+        "Kamalı Pim",
+        "Yaylı Pim"
     ],
-    "ELBOW CONNECTOR ($\\PHI$ 4-PT1/8)": [
-        "Dirsek",
-        "L Dirsek"
+    "NEEDLE_HEAD": [
+        "İğne Kafası"
     ],
-    "TENSION RELEASE CONNECTING PLATE": [
-        "Gerdirme Plakası",
-        "Gerdirme Bağlantısı"
+    "DIFF_FEED_DOG": [
+        "Diferansiyel Dişli",
+        "Diferansiyel Köpek"
     ],
-    "COLLAR": [
-        "Kolar"
+    "YIELDING_SECTION": [
+        "Esnek Parça",
+        "Esneyen Bölüm"
     ],
-    "SUPPORT PLATE": [
-        "Destek Plakası"
+    "CLOTH_PLATE_FRONT": [
+        "Kumaş Altı Ön",
+        "Ön Tabla"
     ],
-    "ST2-A DEVICE, C. SET": [],
-    "AIR TUBE(4 X 2.5MM)(BLACK)": [
-        "Hava Hortumu",
-        "Şeffaf Hortum"
+    "THROAT_PLATE": [
+        "İğne Altı Plakası",
+        "Gargat"
     ],
-    "CORD CLAMP(5Ν- Φ 8.4)": [
-        "Kablo Kelepçesi"
+    "MAIN_FEED_DOG": [
+        "Ana Dişli",
+        "Ana Köpek"
     ],
-    "SCREW (M2-0.4 × 3.5)": [
-        "M2 Vida"
+    "WRAPPING BAND": [
+        "Sargı Bandı"
     ],
-    "THREAD CLAMP": [
-        "İplik Kelepçesi"
+    "LOWER KNIFE CARRIER SUPPORT SPRING": [
+        "Alt Bıçak Taşıyıcı Destek Yayı"
     ],
-    "Y-KNUCKLE": [
-        "Y Mafsal"
-    ],
-    "WIPER": [
-        "Silecek"
-    ],
-    "KNIFE GUIDE LEVER RING (RIGHT)": [
-        "Bıçak Kolu Halkası"
-    ],
-    "CORD CLAMP(5Σ- Φ 8.4)": [
-        "Kablo Kelepçesi"
-    ],
-    "SCREW(M5-0.8 × 8)": [
-        "M5 Vida",
-        "Beşlik Vida"
-    ],
-    "CYLINDER RETURN SPRING": [
-        "Silindir Geri Dönüş Yayı"
-    ],
-    "TRIMMING SOLENOID": [
-        "Tırpan Selenoidi"
-    ],
-    "CLAMP SPRING PRESSURE ADJUSTING PIECE": [
-        "Yay Baskı Ayar Parçası"
-    ],
-    "UN3 DEVICE, COMPLETE SET": [
-        "UN3 Takım"
-    ],
-    "LIFTER CONNECTING ROD": [
-        "Kaldırıcı Kol"
-    ],
-    "WIPER MECHANISM, C. SET": [
-        "Silici Mekanizma"
-    ],
-    "PLUG": [
-        "Fiş"
-    ],
-    "LOOPER THREAD PULL-OFF": [
-        "Lüper İplik Çekici"
-    ],
-    "SCREW(1/8-44 × 3)": [
-        "İnce Vida",
-        "Minik Vida"
-    ],
-    "DUST PROOF FILTER": [
-        "Toz Filtresi"
-    ],
-    "SCREW(1/8-44 × 4.8)": [
-        "İnce Vida",
-        "Minik Vida"
-    ],
-    "INTERMEDIATE CABLE (UT-A42/M)": [
-        "Ara Kablo"
-    ],
-    "CONNECTING BLOCK (RIGHT) SUPPORTSPRING": [
-        "Bağlantı Bloğu (Sağ) Yay Desteği"
-    ],
-    "SCREW(M4-0.7 × 6)": [
-        "M4 Vida"
-    ],
-    "INTERMEDIATE CABLE": [
-        "Ara Kablo"
-    ],
-    "SOLENOID VALVE": [
-        "Selenoid Valf"
-    ],
-    "CRANK CHAMBER COVER": [
-        "Krank Karter Kapağı"
-    ],
-    "SCREW(M6-1 × 6)": [
-        "M6 Vida"
-    ],
-    "CLAMP SPRING PRESSURE HOLDER": [
-        "Yay Baskı Tutucu"
-    ],
-    "PRESSER FOOT LIFTER SOLENOID LEVER": [
-        "Baskı Ayağı Kaldırıcı Selenoid Kolu"
-    ],
-    "MOTOR COVER": [
-        "Motor Kapağı"
-    ],
-    "SCREW (M2-0.4 × 2)": [
-        "M2 Vida",
-        "Minik Vida"
-    ],
-    "SCREW (M2-0.4 X 3.5)": [
-        "M2 Vida",
-        "Minik Vida"
-    ],
-    "NUT(M5-0.8)": [
-        "M5 Somun"
-    ],
-    "PLUNGER CONNECTING ROD": [
-        "Piston Kolu"
-    ],
-    "SCREW(M4-0.7 × 4.8)": [
-        "M4 Vida"
-    ],
-    "SCREW (M4-0.7 × 5)": [
-        "M4 Vida"
-    ],
-    "SCREW (M2.3-0.4 × 10)": [
-        "Minik Vida"
-    ],
-    "CONNECTOR(Φ 6-PT1/4)": [
-        "Konlektör"
-    ],
-    "THREAD PULL-OFF EYELET": [
-        "İplik Çekme Gözü"
-    ],
-    "FIXED TRIMMING KNIFE": [
-        "Sabit Bıçak"
-    ],
-    "SCREW(11/64-40 × 6.5)": [
-        "İnce Vida",
-        "Minik Vida"
-    ],
-    "CORD CLAMP(4N- Ф 6.8)": [
-        "Kablo Kelepçesi"
-    ],
-    "CONNECTOR(Φ 6-PT1/8)": [
-        "Konlektör"
-    ],
-    "POSITIONING PLATE (LOWER)": [
-        "Alt Konumlandırma Plakası"
-    ],
-    "PACKING SCREW(11/64-40 X 3.3)": [
-        "İnce Vida",
-        "Minik Vida"
-    ],
-    "PLUNGER CONNECTING ROD PIN": [
-        "Piston Kolu Pimi"
-    ],
-    "SOLENOID VALVE SUPPORT": [
-        "Selenoid Valf Desteği"
-    ],
-    "SCREW(M5-0.8 × 25)": [
-        "M5 Vida"
-    ],
-    "SCREW(9/64-40 × 4)": [
-        "İnce Vida",
-        "Minik Vida"
-    ],
-    "FOLDER(UPPER)": [
-        "Üst Katlayıcı"
-    ],
-    "SOLENOID RETURN SHAFT": [
-        "Selenoid Geri Dönüş Mili"
-    ],
-    "AIR WIPER": [
-        "Hava Silici"
-    ],
-    "SCREW (M5-0.8 × 8)": [
-        "Civata (M5)",
-        "Vida (M5)"
-    ],
-    "ADJUSTING SCREW (M3-0.5 × 6)": [
-        "Ayar Vidası (M3)",
-        "İnce Ayar Vidası"
-    ],
-    "SUPPLEMENTARY SPRING": [
-        "Takviye Yayı",
-        "Ekstra Yay"
-    ],
-    "THREAD PULL-OFF HOOK UNIT": [
-        "İplik Çekme Kancası"
-    ],
-    "ST2 DEVICE, C. SET": [
-        "ST2 Seti"
-    ],
-    "UPPER KNIFE GUIDE": [
-        "Üst Bıçak Kılavuzu"
+    "SWITCH GUIDE": [
+        "Şalter Kılavuzu",
+        "Svici Kılavuzu"
     ],
     "FOLDER(LEFT)": [
-        "Katlayıcı (Sol)"
+        "Katlayıcı (Sol)",
+        "Földer (Sol)"
     ],
-    "LOWER KNIFE DRIVING LEVER": [
-        "Alt Bıçak Tahrik Kolu"
+    "HOSE BAND": [
+        "Hortum Kelepçesi"
+    ],
+    "SOLENOID RETURN SPRING": [
+        "Selenoid Geri Dönüş Yayı"
+    ],
+    "SOLENOID SUPPORT": [
+        "Selenoid Desteği"
     ],
     "EYE GUARD": [
         "Göz Koruyucu"
     ],
-    "HANGING NUT": [
-        "Asma Somunu"
+    "SWITCH SUPPORT": [
+        "Şalter Desteği",
+        "Sviç Desteği"
     ],
-    "SCREW(M2-0.4 × 2)": [
-        "Minik Vida",
-        "Mikro Vida (M2)"
+    "SOLENOID LEVER PIN": [
+        "Selenoid Kol Pimi"
     ],
-    "KNIFE GUIDE LEVER RING(LEFT)": [
+    "SWITCH": [
+        "Şalter",
+        "Sviç"
+    ],
+    "FIXED TRIMMING KNIFE": [
+        "Sabit Tırpan Bıçağı"
+    ],
+    "UN3 DEVICE, COMPLETE SET": [
+        "UN3 Takımı",
+        "UN3 Cihazı"
+    ],
+    "CONNECTOR HOLDER": [
+        "Konektör Yuvası"
+    ],
+    "SPRING WASHER": [
+        "Yaylı Pul"
+    ],
+    "MOVABLE TRIMMING KNIFE HOLDER": [
+        "Hareketli Tırpan Bıçağı Tutucusu"
+    ],
+    "WIPER": [
+        "Silecek"
+    ],
+    "HANGING BOLT": [
+        "Askı Civatası"
+    ],
+    "TOP COVER THREAD EYELET": [
+        "Üst Kapak İplik Gözü"
+    ],
+    "PRESSER FOOT LIFTER SOLENOID": [
+        "Baskı Ayağı Kaldırıcı Selenoid"
+    ],
+    "LOWER KNIFE CARRIER STOPPER": [
+        "Alt Bıçak Taşıyıcı Stoperi"
+    ],
+    "LIFTER CONNECTING LINK": [
+        "Kaldırıcı Bağlantı Kolu"
+    ],
+    "ST2 DEVICE, C. SET": [
+        "ST2 Takımı",
+        "ST2 Cihazı"
+    ],
+    "WIPER SOLENOID": [
+        "Silecek Selenoidi"
+    ],
+    "SCREWED PIN": [
+        "Vidalı Pim"
+    ],
+    "SPROCKET(LARGE)": [
+        "Büyük Dişli"
+    ],
+    "KNIFE CARRIER GUIDE": [
+        "Bıçak Taşıyıcı Kılavuzu"
+    ],
+    "SYNCHRONIZER CUSHION": [
+        "Senkronizatör Takozu"
+    ],
+    "ADJUSTING SCREW": [
+        "Ayar Vidası"
+    ],
+    "AIR CYLINDER": [
+        "Hava Silindiri"
+    ],
+    "UPPER KNIFE CARRIER": [
+        "Üst Bıçak Taşıyıcısı"
+    ],
+    "UPPER KNIFE GUIDE": [
+        "Üst Bıçak Kılavuzu"
+    ],
+    "SWITCH HOLDER": [
+        "Şalter Tutucusu",
+        "Sviç Tutucusu"
+    ],
+    "SPEED CONTROLLER": [
+        "Sürat Kontrol Cihazı",
+        "Hız Kontrolü"
+    ],
+    "UPPER KNIFE": [
+        "Üst Bıçak"
+    ],
+    "CONNECTING BLOCK(LEFT)": [
+        "Bağlantı Bloğu (Sol)"
+    ],
+    "SILENCER": [
+        "Susturucu"
+    ],
+    "WIPER MECHANISM, C. SET": [
+        "Silecek Mekanizması"
+    ],
+    "TRIMMING SOLENOID": [
+        "Tırpan Selenoidi"
+    ],
+    "KNIFE GUIDE LEVER RING (LEFT)": [
         "Bıçak Kılavuz Kol Halkası (Sol)"
+    ],
+    "CONNECTING ROD": [
+        "Biye Kolu",
+        "Kol"
+    ],
+    "CONNECTOR COVER": [
+        "Konektör Kapağı",
+        "Kapak"
+    ],
+    "MOTOR COVER": [
+        "Motor Kapağı",
+        "Motor Kaputu"
+    ],
+    "SOLENOID RETURN SHAFT": [
+        "Selenoid Geri Mili"
+    ],
+    "ROTATION DETECTOR UNIT": [
+        "Rötasyon Dedektör Ünitesi",
+        "Döndürme Sensörü"
+    ],
+    "THREAD CLAMP SPRING": [
+        "İplik Sıkıştırma Yayı",
+        "İplik Pensesi Yayı"
+    ],
+    "REGULATOR": [
+        "Regülatör",
+        "Ayarlayıcı"
+    ],
+    "SOLENOID BRACKET": [
+        "Selenoid Braket"
+    ],
+    "CYLINDER ROD CHIP": [
+        "Silindir Mili Çipi",
+        "Silindir Çipi"
+    ],
+    "CONNECTING BLOCK (RIGHT) SUPPORTSPRING": [
+        "Sağ Bağlantı Bloğu Destek Yayı"
+    ],
+    "LOWER KNIFE": [
+        "Alt Bıçak"
+    ],
+    "CLAMP SPRING PRESSURE HOLDER": [
+        "Sıkıştırma Yayı Baskı Tutucu",
+        "Pense Yayı Baskısı"
+    ],
+    "DUST PROOF COVER": [
+        "Toz Geçirmez Kapak"
+    ],
+    "FOLDER(UPPER)": [
+        "Katlayıcı",
+        "Föyler"
+    ],
+    "MAIN FEED LEVER STOPPER": [
+        "Ana Besleme Kolu Stoperi",
+        "Ana Besleme Duruşu"
+    ],
+    "SWING-PROOF SPRING": [
+        "Salınım Önleyici Yay"
+    ],
+    "CONNECTING BLOCK": [
+        "Bağlantı Bloğu",
+        "Blok"
+    ],
+    "CONNECTING BLOCK (RIGHT) SUPPORT SPRING": [
+        "Sağ Bağlantı Bloğu Destek Yayı",
+        "Sağ Blok Destek Yayı"
+    ],
+    "HOSE UNION": [
+        "Hortum Rakoru",
+        "Rakor"
+    ],
+    "TERMINAL HOLDER, COMPLETE SET": [
+        "Klemens Tutucu, Komple Set",
+        "Klemens"
+    ],
+    "WIPER HOLDER": [
+        "Silecek Tutucu"
+    ],
+    "CONNECTING BLOCK(RIGHT)": [
+        "Sağ Bağlantı Bloğu",
+        "Sağ Blok"
+    ],
+    "JOINT PIN": [
+        "Menteşe Pimi",
+        "Pin"
+    ],
+    "ANTI-SHOCK RUBBER": [
+        "Titreşim Takozu",
+        "Lastik Takoz"
+    ],
+    "TRIMMING MACHANISM, C. SET": [
+        "Kırpma Mekanizması, C. Seti",
+        "Kırpıcı Takımı"
     ],
     "CONNECTOR": [
         "Konektör",
         "Konjektör"
     ],
-    "WING BOLT(M4-0.7 X 8)": [
+    "WING BOLT": [
         "Keçi Ayağı Vida",
         "Kelebek Vida"
     ],
-    "TRIMMING SOLENID, COMPLETE SET": [
-        "Tırpan Solenoidi (Komple)"
+    "RETAINING RING": [
+        "Segman",
+        "Sekman"
     ],
-    "SOLENOIDE": [
-        "Selenoid",
-        "Salenoid"
+    "CONDENSE FEED LEVER": [
+        "Yoğun Besleme Kolu"
     ],
-    "SOLENOID VALVE HOLDER": [
-        "Selenoid Valf Tutucusu",
-        "Salenoid Yuvası"
+    "SUPPLEMENTARY SPRING": [
+        "Ek Yay"
     ],
-    "ROTATION DETECTOR UNIT": [
-        "Dönüş Sensörü",
-        "Rotasyon Dedektörü"
+    "LOWER KNIFE CARRIER": [
+        "Alt Bıçak Taşıyıcı",
+        "Alt Bıçak Yuvası"
+    ],
+    "SOLENOID LEVER CONNECTING BLOCK": [
+        "Selenoid Kol Bağlantı Bloğu"
+    ],
+    "CONICAL SPRING WASHER": [
+        "Konik Yaylı Pul"
+    ],
+    "GASKET": [
+        "Conta",
+        "Gasket"
+    ],
+    "PLUNGER": [
+        "Piston",
+        "Şamandıra"
+    ],
+    "THREAD CLAMP": [
+        "İplik Pensesi",
+        "İplik Kelepçesi"
+    ],
+    "THREAD PULL-OFF EYELET": [
+        "İplik Çekme Gözü",
+        "İplik Gözü"
+    ],
+    "AIR CYLINDER BRACKET": [
+        "Hava Silindiri Braketi",
+        "Pnömatik Braket"
+    ],
+    "T-CONNECTOR": [
+        "T Rakor"
+    ],
+    "SOLENOID LEVER": [
+        "Selenoid Kolu"
+    ],
+    "ELBOW CONNECTOR": [
+        "Dirsek"
+    ],
+    "ST2-A DEVICE, C. SET": [
+        "ST2 Takım"
+    ],
+    "POSITIONING PLATE (LOWER)": [
+        "Alt Tabla",
+        "Pozisyon Tablası"
+    ],
+    "REGULATOR SUPPORT": [
+        "Regülatör Ayağı"
+    ],
+    "CRANK CHAMBER COVER": [
+        "Krank Karter Kapağı"
+    ],
+    "CYLINDER JOINT PIN": [
+        "Silindir Pim",
+        "Birleştirme Pimi"
     ],
     "RUBBER CUSHION": [
         "Lastik Takoz",
-        "Lastik",
-        "Kauçuk"
+        "Körük"
     ],
-    "CHAIN": [
-        "Zincir"
+    "LIFTER CONNECTING ROD": [
+        "Kaldırıcı Kol"
     ],
-    "THREAD PULL-OFF BAR HOLDER": [
-        "İplik Çekme Çubuğu Tutucusu"
+    "CS DEVICE, C. SET": [
+        "CS Takım"
     ],
-    "JOINT PIN": [
-        "Menteşe Pimi",
-        "Eklem Pimi"
+    "TIMING VELT": [
+        "Triger Kayışı"
     ],
-    "SWITCH HOLDER": [
-        "Switch Tutucusu",
-        "Şalter Yuvası"
+    "TRIMMING DEVICE, COMPLETE SET": [
+        "Tırpan Takımı",
+        "Kesici Takım"
     ],
-    "WIPER BAR GUIDE": [
-        "Silici Çubuğu Kılavuzu",
-        "Silecek Çubuğu Kılavuzu"
+    "PRESSER FOOT LIFTER SOLENOID LEVER": [
+        "Baskı Ayağı Kaldırıcı Solenoid Kolu"
     ],
-    "LOWER KNIFE CARRIER SUPPORT SPRING": [
-        "Alt Bıçak Taşıyıcı Destek Yayı"
+    "TERMINAL HOLDER": [
+        "Klemens Yuvası"
     ],
-    "INTERMEDIATE CABLE (UT-A44/M, UT-A44/ST2-A/M)": [
-        "Ara Kablo",
-        "Kablo (UT-A44)"
+    "WASHER": [
+        "Pul"
+    ],
+    "SYNCHRONIZER POSITIONING PIN": [
+        "Senkronizasyon Pimi"
+    ],
+    "KNIFE GUIDE LEVER": [
+        "Bıçak Kılavuz Kolu"
+    ],
+    "DUST PROOF FILTER": [
+        "Toz Filtresi"
+    ],
+    "MOVABLE TRIMMING KNIFE": [
+        "Hareketli Tırpan Bıçağı",
+        "Hareketli Kesici Bıçak"
+    ],
+    "Y-CONNECTOR": [
+        "Y Bağlantı"
     ],
     "CYLINDER BRACKET": [
         "Silindir Braketi",
         "Silindir Ayağı"
     ],
-    "DUST PROOF COVER": [
-        "Toz Kapağı"
+    "LOOPER THREAD PULL-OFF": [
+        "Lüper İplik Çekici"
     ],
-    "AIR TUBE(4 X 2.5MM) (BLACK)": [
-        "Hava Hortumu (4'lük)",
-        "Hava Borusu (4'lük)"
+    "THREAD GUIDE": [
+        "İplik Kılavuzu"
     ],
-    "SCREW(M2-0.4 × 4)": [
-        "Minik Vida (M2)",
-        "Mikro Vida (M2)"
+    "PLUG": [
+        "Fış",
+        "Tapla"
     ],
-    "T-CONNECTOR(Φ 6-PT1/4)": [
-        "T Konnektör (6'lık)",
-        "T Rakoru"
+    "SWITCH, COMPLETE SET": [
+        "Şalter Takımı",
+        "Siviç Takımı"
     ],
-    "HOLDER SUPPORT": [
-        "Tutucu Desteği",
-        "Yuva Desteği"
+    "TRIMMING SOLENOID SUPPORT": [
+        "Tırpan Solenoid Desteği",
+        "Kesici Solenoid Ayağı"
     ],
-    "SCREW (M2.5-0.45 × 10)": [
-        "Minik Vida (M2.5)"
+    "WOOD SCREW": [
+        "Vidalı Vida",
+        "Ağaç Vidası"
     ],
-    "AIR TUBE(6 X 4MM) (BLACK)": [
-        "Hava Hortumu (6'lık)",
-        "Hava Borusu (6'lık)"
+    "PRESSER FOOT LIFTER CYLINDER, C. SET": [
+        "Baskı Ayağı Kaldırıcı Silindir Takımı"
+    ],
+    "CLAMP SPRING PRESSURE ADJUSTING PIECE": [
+        "Kelepçe Yayı Basınç Ayar Parçası"
+    ],
+    "UPPER KNIFE CARRIER SPRING": [
+        "Üst Bıçak Taşıyıcı Yayı"
+    ],
+    "BLANK PLUG": [
+        "Kör Tapa",
+        "Kör Fiş"
+    ],
+    "UNCURLING AIR PIPE": [
+        "Kıvrım Açma Hava Borusu"
     ],
     "KNIFE GUIDE LEVER RING(RIGHT)": [
-        "Bıçak Kılavuz Kol Halkası (Sağ)"
-    ],
-    "KNIFE GUIDE": [
-        "Bıçak Kılavuzu"
-    ],
-    "Y-CONNECTOR(Φ 4- Φ 6)": [
-        "Y Konnektör",
-        "Y Rakoru"
-    ],
-    "CONICAL SPRING WASHER": [
-        "Konik Rondela"
-    ],
-    "UPPER KNIFE CARRIER": [
-        "Üst Bıçak Taşıyıcı"
-    ],
-    "SPROCKET(LARGE)": [
-        "Dişli Büyük"
-    ],
-    "PRESSER FOOT LIFTER SOLENOID, C. SET": [
-        "Baskı Ayağı Kaldırma Selenoidi Takım"
-    ],
-    "MAIN FEED LEVER STOPPER": [
-        "Ana Besleme Kolu Stoperi",
-        "Ana Besleme Kolu Dayama"
+        "Bıçak Kılavuz Kolu Halkası (Sağ)"
     ],
     "MOTOR BRACKET": [
-        "Motor Braketi",
         "Motor Ayağı"
     ],
-    "O-RING (P4)": [
-        "O-Ring"
+    "Y-KNUCKLE": [
+        "Y Mafsal"
     ],
-    "CONNECTOR COVER": [
-        "Konnekte Kapak",
-        "Konnektör Kapağı"
+    "CONNECTING LINK PIN": [
+        "Bağlantı Link Pimi"
+    ],
+    "GUIDE PLATE": [
+        "Kılavuz Plaka"
+    ],
+    "PRESSER FOOT LIFTER SOLENOID, C. SET": [
+        "Baskı Ayağı Kaldırıcı Solenoid Takımı"
     ],
     "MANIFOLD": [
         "Manifolt"
     ],
-    "SCREW(M4-0.7 × 7.3)": [
-        "M4 Vida"
+    "SOLENOID DUST-PROOF COVER": [
+        "Solenoid Toz Geçirmez Kapağı"
     ],
-    "SWING-PROOF SPRING": [
-        "Salınım Yayı",
-        "Savrulmaz Yay"
-    ],
-    "AIR TUBE (6 X 4MM) (BLACK)": [
-        "Hava Hortumu",
-        "Hava Borusu"
-    ],
-    "SOLENOID RETURN SPRING": [
-        "Selenoid Geri Dönüş Yayı"
-    ],
-    "SCREW(M5-0.8 × 14)": [
-        "M5 Vida"
-    ],
-    "INTERMEDIATE CABLE (UT-A44/CS, UT-A44/ST2-A/CS) 中継ケーブル": [
-        "Ara Kablo"
-    ],
-    "HOSE UNION": [
-        "Hortum Rakoru"
-    ],
-    "PRESSER FOOT LIFTER SOLENOID": [
-        "Baskı Ayağı Kaldırma Selenoidi"
-    ],
-    "CONDENSE FEED LEVER": [
-        "Yoğun Besleme Kolu"
-    ],
-    "ADJUSTING SCREW(M3-0.5 × 6)": [
-        "Ayar Vidası"
+    "SWITCH COVER": [
+        "Şalter Kapağı"
     ],
     "SPROCKET(SMALL)": [
-        "Dişli Küçük"
+        "Dişli"
     ],
-    "SCREW(9/64-40 × 7)": [
-        "İnç Vida"
-    ],
-    "CONNECTOR HOLDER": [
-        "Konnekte Tutucu",
-        "Konnektör Tutucu"
-    ],
-    "SCREW(M5-0.8 × 7)": [
-        "M5 Vida"
-    ],
-    "CONNECTING BLOCK(LEFT)": [
-        "Bağlantı Bloğu (Sol)",
-        "Klemens (Sol)"
-    ],
-    "SCREW(M3-0.5 × 4.5)": [
-        "M3 Vida"
-    ],
-    "AIR CYLINDER": [
-        "Hava Silindiri",
-        "Pnömatik Silindir"
-    ],
-    "TRIMMING MECHANISM, C. SET": [
-        "Kırpma Mekanizması Takım",
-        "İplik Kesme Takımı"
+    "SOLENOID VALVE SUPPORT": [
+        "Selenoid Desteği",
+        "Selenoid Ayağı"
     ],
     "SPROCKET COVER": [
         "Dişli Kapağı"
     ],
-    "REGULATOR SUPPORT": [
-        "Regülatör Desteği"
-    ],
-    "WASHER": [
-        "Pul"
-    ],
     "THREAD CLAMP RUBBER": [
-        "İplik Sıkıştırma Lastiği"
+        "İplik Sıkıştırma Lastiği",
+        "İplik Lastiği"
     ],
-    "SPRING": [
-        "Yay"
+    "UPPER KNIFE CARRIER STOPPER": [
+        "Üst Bıçak Taşıyıcı Stoper",
+        "Üst Bıçak Dayanağı"
     ],
-    "SWITCH, COMPLETE SET": [
-        "Şalter Takım",
-        "Komple Şalter"
+    "UNION Y-CONNECTOR": [
+        "Y Rakoru"
     ],
-    "SCREW(M4-0.7 × 8)": [
-        "M4 Vida"
+    "TERMINAL HOLDER SUPPORT": [
+        "Klemens Desteği",
+        "Klemens Ayağı"
     ],
-    "SCREW (M3.5-0.6 × 8)": [
-        "M3.5 Vida"
+    "AIR WIPER": [
+        "Hava Silici",
+        "Viper"
     ],
-    "SCREW(1/8-44 X 3)": [
-        "İnç Vida"
+    "CHAIN": [
+        "Zincir"
     ],
-    "RETAINING RING": [
-        "Segman"
+    "KNIFE GUIDE LEVER RING(LEFT)": [
+        "Bıçak Kılavuz Kol Halkası (Sol)"
     ],
-    "CONNECTING LINK PIN": [
-        "Bağlantı Pimi"
+    "TENSION RELEASE BLOCK": [
+        "Gerginlik Bırakma Bloğu"
+    ],
+    "SUPPORT PLATE": [
+        "Destek Plakası"
+    ],
+    "PACKING SCREW": [
+        "Rakora Vida",
+        "Ambalaj Vidası"
+    ],
+    "THREAD PULL-OFF BAR HOLDER": [
+        "İplik Çekme Çubuğu Tutucusu"
+    ],
+    "SOLENOID PLATE": [
+        "Selenoid Plakası"
+    ],
+    "O-RING": [
+        "O-Ring",
+        "O-ring"
+    ],
+    "THREAD PULL-OFF HOOK UNIT": [
+        "İplik Çekme Kancası Takımı"
+    ],
+    "LOWER KNIFE DRIVING LEVER": [
+        "Alt Bıçak Tahrik Kolu"
+    ],
+    "KNIFE GUIDE LEVER RING (RIGHT)": [
+        "Bıçak Kılavuz Kol Halkası (Sağ)"
+    ],
+    "CLAMP SPRING": [
+        "Sıkıştırma Yayı",
+        "Kelepçe Yayı"
+    ],
+    "WIPER BAR GUIDE": [
+        "Viper Çubuğu Kılavuzu"
+    ],
+    "KNIFE GUIDE": [
+        "Bıçak Kılavuzu"
+    ],
+    "AIR TUBE": [
+        "Hava Hortumu"
+    ],
+    "HANGING NUT": [
+        "Asma Somun",
+        "Askı Somunu"
+    ],
+    "HOLDER SUPPORT": [
+        "Tutucu Desteği",
+        "Tutucu Ayağı"
+    ],
+    "CYLINDER RETURN SPRING": [
+        "Silindir Geri Dönüş Yayı"
+    ],
+    "CORD CLAMP": [
+        "Kablo Kelepçesi"
+    ],
+    "CLAMP SPRING PRESSURE": [
+        "Sıkıştırma Yayı Basıncı"
+    ],
+    "TENSION RELEASE CONNECTING PLATE": [
+        "Gerginlik Bırakma Bağlantı Plakası"
+    ],
+    "SPRING HANGER": [
+        "Yay Askısı"
+    ],
+    "COLLAR": [
+        "Kovan"
+    ],
+    "TRIMMING MECHANISM, C. SET": [
+        "Kırpma Mekanizması Takımı",
+        "Tırpız Mekanizması"
+    ],
+    "MINAS INSTALLATION KIT": [
+        "Minas Montaj Kiti"
+    ],
+    "WIPER BAR": [
+        "Viper Çubuğu"
+    ],
+    "SOLENOID VALVE HOLDER": [
+        "Selenoid Valf Tutucusu"
     ],
     "THREAD PULL-OFF BAR": [
         "İplik Çekme Çubuğu"
     ],
-    "MINAS INSTALLATION KIT(UT-A42/CS/M)": [
-        "Minas Montaj Kiti"
+    "TRIMMING SOLENID, COMPLETE SET": [
+        "Kırpma Selenoidi, Komple Takım",
+        "Tırpız Selenoidi"
     ],
-    "SCREW(M2-0.4 × 6)": [
-        "M2 Vida"
+    "POSITIONING PLATE (UPPER)": [
+        "Konumlandırma Plakası (Üst)"
     ],
-    "SCREW(M6-1 × 12)": [
-        "M6 Vida"
+    "SOLENOID VALVE, C. SET": [
+        "Selenoid Valf Takımı",
+        "Selenoid Takımı"
     ],
-    "KNIFE CARRIER GUIDE": [
-        "Bıçak taşıyıcı kılavuz",
-        "Bıçak gezdiren"
+    "FOLDER(RIGHT)": [
+        "Katlayıcı (Sağ)",
+        "Föyler"
     ],
-    "SOLENOID BRACKET": [
-        "Selenoid braket",
-        "Selenoid ayağı"
+    "POSITIONING PLATE": [
+        "Pozisyon Plaka",
+        "Pozisyon Sacı"
     ],
-    "MOVABLE TRIMMING KNIFE": [
-        "Hareketli traş bıçağı",
-        "Oynar bıçak"
+    "NUT": [
+        "Somun"
     ],
-    "UNCURLING AIR PIPE": [
-        "Hava hortumu",
-        "Hava borusu"
+    "AIR CYLINDER HOLDER": [
+        "Hava Silindiri Ayağı",
+        "Pnömatik Silindir Ayağı"
     ],
-    "SYNCHRONIZER POSITIONING PIN": [
-        "Senkronizasyon pimi",
-        "Senkron pim"
+    "SOLENOIDE": [
+        "Selenoid"
     ],
-    "SCREW(M4-0.7 × 9)": [
-        "M4 vida",
-        "Dörtlük vida"
+    "INTERMEDIATE CABLE": [
+        "Ara Kablo"
     ],
-    "LOWER KNIFE": [
+    "PLUNGER CONNECTING ROD": [
+        "İtici Kolu",
+        "Şimşek Kolu"
+    ],
+    "SOLENOID COVER": [
+        "Selenoid Kapağı"
+    ],
+    "SOLENOID VALVE": [
+        "Selenoid Valf"
+    ],
+    "BOLT": [
+        "Civata"
+    ],
+    "PLUNGER CONNECTING ROD PIN": [
+        "İtici Kol Pimi",
+        "Şimşek Kol Pimi"
+    ],
+    "送料压力调节螺钉螺母": [
+        "Baskı Ayar Vidası",
+        "Baskı Vidası"
+    ],
+    "橡胶下垫片": [
+        "Lastik Pul",
+        "Lastik Conta"
+    ],
+    "护针连杆": [
+        "İğne Koruma Çubuğu"
+    ],
+    "推板螺钉": [
+        "İtici Vida"
+    ],
+    "安装螺杆垫圈": [
+        "Civata Pul",
+        "Vida Pulu"
+    ],
+    "送料调节板紧固螺钉": [
+        "Besleme Ayar Plakası Vidası",
+        "Plaka Vidası"
+    ],
+    "离合器止动板": [
+        "Debriyaj Stoper Plakası",
+        "Stop Plakası"
+    ],
+    "送料连杆": [
+        "Besleme Kolu"
+    ],
+    "防护板座": [
+        "Koruma Plakası Ayağı",
+        "Muhafaza Ayağı"
+    ],
+    "弹性圆柱销": [
+        "Pim",
+        "Silindirik Pim"
+    ],
+    "被动轮架": [
+        "Kasnak Yuvası",
+        "Dişli Yuvası"
+    ],
+    "送料轴轴套": [
+        "Besleme Mili Burcu",
+        "Mil Kovanı"
+    ],
+    "导料板": [
+        "Kılavuz Plaka",
+        "Kılavuz Sac"
+    ],
+    "下摆料块螺钉": [
+        "Alt Bıçak Bloğu Vidası",
+        "Alt Bıçak Vidası"
+    ],
+    "长轴定位板": [
+        "Uzun Mil Konumlandırma Plakası"
+    ],
+    "送料调节螺钉": [
+        "Besleme Ayar Vidası"
+    ],
+    "上刀右曲柄销": [
+        "Üst Bıçak Sağ Krank Pimi",
+        "Bıçak Krank Pimi"
+    ],
+    "上刀传动轴右套": [
+        "Üst Bıçak Tahrik Mili Sağ Burç"
+    ],
+    "被动轮架轴": [
+        "Kasnak Yuvası Mili",
+        "Dişli Yuvası Mili"
+    ],
+    "上刀滑块轴": [
+        "Üst Bıçak Kayar Parça Mili",
+        "Bıçak Kayar Parça Mili"
+    ],
+    "下刀压板": [
+        "Alt Bıçak Baskı Plakası",
+        "Alt Bıçak Bastırma Plakası"
+    ],
+    "送料轴卡簧": [
+        "Besleme Mili Segmanı",
+        "Mil Segmanı"
+    ],
+    "废料斗": [
+        "Çöp Kovası",
+        "Atık Kutusu"
+    ],
+    "下摆料架座外垫圈": [
+        "Alt Bıçak Yuvası Dış Pul",
+        "Dış Pul"
+    ],
+    "送料滑块调节座紧固螺钉": [
+        "Besleme Kayar Parça Ayar Yuvası Vidası",
+        "Kayar Parça Vidası"
+    ],
+    "送料调节座": [
+        "Besleme Ayar Yuvası",
+        "Besleme Ayar Bloğu"
+    ],
+    "离合器内轮隔离圈": [
+        "Debriyaj İç Dişli Ayırıcı",
+        "İç Dişli Taksimatı"
+    ],
+    "导带板": [
+        "Kılavuz Bant Plakası"
+    ],
+    "上轴后节": [
+        "Üst Mil Arka Parça",
+        "Mil Arka Parça"
+    ],
+    "送料滑块": [
+        "Besleme Kayar Parça",
+        "Besleme Takozu"
+    ],
+    "废料槽(上)": [
+        "Çöp Oluk",
+        "Atık Oluk"
+    ],
+    "送料调节滑杆": [
+        "Besleme Ayar Çubuğu",
+        "Besleme Sürgüsü"
+    ],
+    "上刀左曲柄滑块": [
+        "Üst Bıçak Sol Krank Kayar Parça",
+        "Bıçak Krank Kayar Parça"
+    ],
+    "送料连杆螺钉": [
+        "Besleme Kolu Vidası"
+    ],
+    "过料杆": [
+        "Malzeme Geçirme Çubuğu",
+        "Pasa Çubuğu"
+    ],
+    "下摆料杆": [
+        "Alt Bıçak Çubuğu"
+    ],
+    "下摆料架座内垫圈(GB97.1-85)": [
+        "Alt Bıçak Yuvası İç Pul",
+        "İç Pul"
+    ],
+    "导带钩": [
+        "Kılavuz Bant Kancası",
+        "Kanca"
+    ],
+    "送布牙": [
+        "Dişli",
+        "Besleme Dişi"
+    ],
+    "离合器滚柱垫片": [
+        "Debriyaj Ruloman Pul",
+        "Rulman Pulu"
+    ],
+    "安装螺栓螺母": [
+        "Civata somun",
+        "Cıvata-somun"
+    ],
+    "左置板": [
+        "Sol plaka",
+        "Sol taraf"
+    ],
+    "推板扶手": [
+        "Kol",
+        "Tutma kolu"
+    ],
+    "护针连杆销": [
+        "İğne kolu pimi",
+        "Koruma kolu pimi"
+    ],
+    "废料桶(下)": [
+        "Çöp kovası (alt)",
+        "Atık kutusu (alt)"
+    ],
+    "橡胶座": [
+        "Lastik takoz",
+        "Kauçuk takoz"
+    ],
+    "下刀架止动板": [
+        "Alt bıçak dayama plakası",
+        "Alt bıçak stoperi"
+    ],
+    "废料桶架": [
+        "Çöp kovası askısı",
+        "Atık kutusu askısı"
+    ],
+    "送料调节滑杆内镶片": [
+        "Besleme ayar çubuğu iç takozu",
+        "Besleme ayar çubuğu iç parçası"
+    ],
+    "送料调节滑杆螺母": [
+        "Besleme ayar çubuğu somunu",
+        "Besleme çubuğu somunu"
+    ],
+    "送料轴螺钉": [
+        "Besleme mili vidası",
+        "Besleme mili civatası"
+    ],
+    "压脚底板限位螺母": [
+        "Baskı ayağı taban limit somunu",
+        "Baskı ayağı alt limit somunu"
+    ],
+    "送料调节滑杆外镶片": [
+        "Besleme ayar çubuğu dış takozu",
+        "Besleme ayar çubuğu dış parçası"
+    ],
+    "主动轮紧固螺钉": [
+        "Tahrik kasnağı sıkma vidası",
+        "Ana kasnak vidası"
+    ],
+    "压力调节扶手镶圈": [
+        "Basınç ayar kolu pulu",
+        "Basınç ayar kolu rondelası"
+    ],
+    "被动轮": [
+        "Kasnak",
+        "Pasif kasnak"
+    ],
+    "导杆销螺钉": [
+        "Kılavuz pim vidası",
+        "Kılavuz pim civatası"
+    ],
+    "下挡料架座": [
+        "Alt siperlik yuvası",
+        "Alt siperlik yatağı"
+    ],
+    "穿线钢丝": [
+        "İplik geçirme teli",
+        "Tel"
+    ],
+    "滚轮架紧固螺钉": [
+        "Rulo tutucu sıkma vidası",
+        "Rulo tutucu civatası"
+    ],
+    "护针连杆螺钉": [
+        "İğne kolu vidası",
+        "Koruma kolu vidası"
+    ],
+    "滚轮架连接块": [
+        "Rulo tutucu bağlantı bloğu",
+        "Rulo tutucu bağlantı parçası"
+    ],
+    "上刀架": [
+        "Üst bıçaklık",
+        "Üst kesici"
+    ],
+    "上刀架轴套": [
+        "Üst bıçaklık burcu",
+        "Üst kesici burcu"
+    ],
+    "下导屑板": [
+        "Alt talaş kılavuzu",
+        "Alt talaş sıyırıcı"
+    ],
+    "支撑板": [
+        "Destek plakası",
+        "Destek sacı"
+    ],
+    "上刀左曲杆": [
+        "Üst bıçak sol kolu",
+        "Üst kesici sol kol"
+    ],
+    "导屑板长轴": [
+        "Talaş kılavuzu uzun mil",
+        "Talaş sıyırıcı uzun mil"
+    ],
+    "送料压力调节螺钉": [
+        "Besleme basınç ayar vidası",
+        "Besleme basınç civatası"
+    ],
+    "连杆座": [
+        "Kol yuvası",
+        "Bağlantı kolu yatağı"
+    ],
+    "橡胶座螺钉": [
+        "Lastik takoz vidası",
+        "Kauçuk takoz vidası"
+    ],
+    "上刀传动轴左套": [
+        "Üst bıçak tahrik mili sol burcu",
+        "Üst kesici tahrik mili sol burcu"
+    ],
+    "右上方挡料块螺钉": [
+        "Sağ üst siperlik bloğu vidası",
+        "Sağ üst siperlik bloğu civatası"
+    ],
+    "导屑板短轴": [
+        "Talaş kılavuzu kısa mil",
+        "Talaş sıyırıcı kısa mil"
+    ],
+    "上刀连杆": [
+        "Üst bıçak kolu",
+        "Üst kesici kolu"
+    ],
+    "带架配件": [
+        "Kızak parçaları",
+        "Taşıyıcı aksam"
+    ],
+    "送料压力调节圈": [
+        "Besleme basınç ayar halkası",
+        "Besleme basınç ayar pulu"
+    ],
+    "离合器外轮": [
+        "Debriyaj dış kasnağı",
+        "Kavrama dış kasnağı"
+    ],
+    "差动刻度板": [
+        "Diferansiyel ölçek plakası",
+        "Diferansiyel skala plakası"
+    ],
+    "送料连杆下轴承内套": [
+        "Besleme kolu alt yatak iç bileziği",
+        "Besleme kolu alt yatak iç bileziği"
+    ],
+    "压力调节槽上下垫片(GB97.1-85)": [
+        "Pul"
+    ],
+    "送料调节扒手紧固螺钉": [
+        "Ayar kolu vidası"
+    ],
+    "主动轮": [
+        "Volan"
+    ],
+    "送料轴卡槽垫片": [
+        "Mil pulu"
+    ],
+    "右垫块螺钉": [
+        "Sağ baskı vidası"
+    ],
+    "上刀滑块轴闷头": [
+        "Üst bıçak mili burcu"
+    ],
+    "离合器滚柱": [
+        "Debriyaj bilyası"
+    ],
+    "下摆料架轴位螺钉紧固螺钉": [
+        "Alt baskı kolu mili vidası"
+    ],
+    "前置板": [
+        "Ön kapak"
+    ],
+    "上摆料块轴紧固螺钉": [
+        "Üst baskı bloğu mili vidası"
+    ],
+    "送料连杆下轴承": [
+        "Çatal pimi alt yatak"
+    ],
+    "辅压脚底板螺钉": [
+        "Baskı ayağı taban vidası"
+    ],
+    "离合器注油孔螺钉": [
+        "Debriyaj yağlık vidası"
+    ],
+    "送料连杆内套": [
+        "Çatal pimi iç kovanı"
+    ],
+    "左垫块螺钉": [
+        "Sol baskı vidası"
+    ],
+    "离合器滚柱垫片销弹簧": [
+        "Debriyaj bilya pulu segmanı"
+    ],
+    "下摆料架": [
+        "Alt baskı kolu"
+    ],
+    "护指器": [
+        "Parçalık"
+    ],
+    "护针曲柄": [
+        "İğne kolu"
+    ],
+    "下摆料架限位板紧固螺钉": [
+        "Alt baskı kolu limit sacı vidası"
+    ],
+    "垫圈(BQ10008)": [
+        "Pul"
+    ],
+    "过料杆左垫块": [
+        "Çubuk sol baskı"
+    ],
+    "离合器配件": [
+        "Debriyaj parçaları"
+    ],
+    "上刀传动轴座": [
+        "Üst bıçak mil yuvası"
+    ],
+    "下刀架轴套": [
+        "Alt bıçak yatağı"
+    ],
+    "下导屑板螺钉": [
+        "Alt talaş sacı vidası"
+    ],
+    "下摆料架紧固螺钉": [
+        "Alt baskı kolu vidası"
+    ],
+    "橡胶塞": [
+        "Lastik tapa"
+    ],
+    "送料压力调节扒手": [
+        "Ayar kolu"
+    ],
+    "下刀架": [
         "Alt bıçak"
     ],
-    "UPPER KNIFE": [
-        "Üst bıçak"
+    "送料调节板": [
+        "Ayar plakası"
     ],
-    "INTERMEDIATE CABLE (UT-A42)": [
-        "Ara kablo"
+    "下摆料块": [
+        "Alt baskı bloğu"
     ],
-    "SOLENOID PLATE": [
-        "Selenoid plakası"
+    "上摆料块轴": [
+        "Üst baskı bloğu mili"
     ],
-    "TRIMMING SOLENOID SUPPORT": [
-        "Traş selenoid desteği",
-        "Selenoid destek"
+    "导屑板": [
+        "Talaş sacı"
     ],
-    "SCREW(M3-0.5 × 3.5)": [
-        "M3 vida",
-        "Üçlük vida"
+    "开口挡圈": [
+        "Segman"
     ],
-    "SCREW (M4-0.7 × 5.5)": [
-        "M4 vida",
-        "Dörtlük vida"
+    "木螺钉": [
+        "Vidalı ağaç vidası"
     ],
-    "CORD CLAMP(6Ν- Φ 10.6)": [
-        "Kablo kelepçesi"
+    "双凸轮": [
+        "Çift kam"
     ],
-    "THREAD GUIDE": [
-        "İplik kılavuzu",
-        "İplik geçirme"
+    "除屑板": [
+        "Talaş sıyırıcı"
     ],
-    "SCREW(M4-0.7 × 2.5)": [
-        "M4 vida",
-        "Dörtlük vida"
+    "送料滑块支紧螺钉": [
+        "Besleme bloğu sabitleme vidası"
     ],
-    "WOOD SCREW($ 5.1 × 20)": [
-        "Vida (5'lik)",
-        "Sunta Vidası"
+    "离合器内轮隔离圈紧固螺钉": [
+        "Debriyaj iç halka vidası"
     ],
-    "CONNECTOR($ 4-PT1/8)": [
-        "Rakoru (4'lük)"
+    "差动牙": [
+        "Diferansiyel Dişli"
     ],
-    "CONNECTOR($6-PT1/4)": [
-        "Rakoru (6'lık)"
+    "压脚组件": [
+        "Baskı Ayağı Takımı",
+        "Ayağın Takımı"
     ],
-    "CORD CLAMP(6N- $ 10.6)": [
-        "Kablo Mengene",
-        "Kordon Kelepçesi"
+    "过料杆右垫块": [
+        "Kumaş Kolu Sağ Takoz"
     ],
-    "ELBOW CONNECTOR (Ø 4-PT1/8)": [
-        "Dirsek Rakoru (4'lük)"
+    "下摆料架座轴位螺钉": [
+        "Alt Plaka Mili Civatası"
     ],
-    "INTERMEDIATE CABLE (UT-A44/CS, UT-A44/ST2-A/CS)": [
-        "Ara Kablo",
-        "Kablo (UT-A44)"
+    "上刀右曲柄": [
+        "Üst Bıçak Krankı",
+        "Üst Bıçak Eğrisi"
+    ],
+    "安装螺杆头": [
+        "Montaj Vidası Başı"
+    ],
+    "辅压脚底板簧": [
+        "Yardımcı Baskı Ayağı Alt Plaka Yayı"
+    ],
+    "下摆料架限位板": [
+        "Alt Plaka Limit Plakası"
+    ],
+    "压脚底板限位螺钉": [
+        "Baskı Ayağı Limit Vidası"
+    ],
+    "上刀挡油板": [
+        "Üst Bıçak Yağlık"
+    ],
+    "被动轮轴": [
+        "Kasnak Mili"
+    ],
+    "送料连杆上轴承": [
+        "Kumaş Kolu Üst Rulmanı"
+    ],
+    "密封圈": [
+        "Keçe"
+    ],
+    "下刀架座": [
+        "Alt Bıçak Yuvası"
+    ],
+    "送料轴": [
+        "Kumaş Mili"
+    ],
+    "上刀架轴": [
+        "Üst Bıçak Mili"
+    ],
+    "导带钩螺钉": [
+        "Kılavuz Kanca Vidası"
+    ],
+    "皮带罩": [
+        "Kayış Muhafazası",
+        "Kayış Kapağı"
+    ],
+    "送料调节座定位螺钉": [
+        "Kumaş Ayar Yuvası Sabitleme Vidası"
+    ],
+    "压脚导料板": [
+        "Baskı Ayağı Kılavuz Plakası"
+    ],
+    "支撑板橡胶垫片": [
+        "Destek Plakası Kauçuk Takozu"
+    ],
+    "上摆料块": [
+        "Üst Plaka Takozu"
+    ],
+    "安装螺杆": [
+        "Montaj Vidası"
+    ],
+    "送料滑块调节座": [
+        "Kumaş Kayıcı Ayar Yuvası"
+    ],
+    "导屑板架": [
+        "Talaş Kılavuz Plaka Yuvası"
+    ],
+    "导杆簧": [
+        "Kılavuz Çubuk Yayı"
+    ],
+    "滚轮架": [
+        "Rulo Yuvası"
+    ],
+    "离合器内轮": [
+        "Debriyaj İç Dişlisi"
+    ],
+    "上刀传动轴": [
+        "Üst Bıçak İletim Mili"
+    ],
+    "推板簧": [
+        "İtici Plaka Yayı"
+    ],
+    "送料滑块调节螺钉": [
+        "Kumaş Kayıcı Ayar Vidası"
+    ],
+    "压力调节螺钉卡簧(GB896-86)": [
+        "Baskı Ayar Vidası Segmanı"
+    ],
+    "离合器止动板紧固螺钉": [
+        "Debriyaj Durdurma Plakası Sabitleme Vidası"
+    ],
+    "被动轮架螺钉": [
+        "Kasnak Yuvası Vidası"
+    ],
+    "鞋形垫圈": [
+        "Ayakkabı Tipi Pul"
     ]
 }

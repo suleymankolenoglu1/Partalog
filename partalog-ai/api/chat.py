@@ -1,222 +1,192 @@
 """
-Partalog AI - Chat API (Expert Mode V39 - Compatibility Fix)
+Partalog AI - Chat API (Final v4.1 - Turkish Native Mode 🇹🇷)
 ------------------------------------------------
-1. COMPATIBILITY: C# için hem 'answer' hem 'reply' hem de 'sources' döner.
-2. LOGIC: V38'in zekası (Router + Regex + Sözlük + Sayaçlar) aynen korundu.
+1. NO DICTIONARY: Sözlük iptal. "SCREW" yok, "VİDA" var.
+2. NATIVE SEARCH: Kullanıcı ne derse o aranır (3072 Vektör).
+3. SMART ROUTER: Marka ve Parça ismini ayıklar.
 """
 
 import aiohttp
 import json
-import os
-import re
 import urllib.parse
 from fastapi import APIRouter, Form
 from loguru import logger
 from config import settings
-from services.vector_db import search_parts
+
+# ✅ Gerekli Servisler
+from services.embedding import get_text_embedding 
+# 🛠️ DÜZELTME: Artık 'services' klasöründen çağırıyoruz
+from services.vector_db import search_vector_db 
 
 router = APIRouter()
 
-# ⚡️ Gemini 2.0 Flash
+# ⚡️ Gemini API
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
 SHOP_BASE_URL = "https://www.parcagalerisi.com/ara/"
 
 # =========================================================
-# 🛠️ TÜRKÇE NORMALİZASYON
+# 🕵️‍♂️ ROUTER: NİYET VE PARÇA ANALİZİ (TÜRKÇE)
 # =========================================================
-def tr_upper(text: str) -> str:
-    if not text: return ""
-    text = text.replace("i", "İ").replace("ı", "I")
-    text = text.replace("ğ", "Ğ").replace("ü", "Ü").replace("ş", "Ş").replace("ö", "Ö").replace("ç", "Ç")
-    return text.upper()
-
-# =========================================================
-# 📚 SÖZLÜK YÖNETİMİ
-# =========================================================
-INDUSTRIAL_DICT = {}
-
-def load_dictionary():
-    global INDUSTRIAL_DICT
-    file_path = "sanayi_sozlugu.json"
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                INDUSTRIAL_DICT = json.load(f)
-            logger.success(f"📚 Sanayi Sözlüğü Yüklendi: {len(INDUSTRIAL_DICT)} terim.")
-        except Exception as e:
-            logger.error(f"⚠️ Sözlük hatası: {e}")
-            INDUSTRIAL_DICT = {}
-    else:
-        logger.warning("⚠️ Sözlük dosyası yok.")
-
-load_dictionary()
-
-def search_in_dictionary(query):
-    query_clean = tr_upper(query.strip())
-    logger.debug(f"📖 Sözlükte aranıyor: '{query_clean}'")
-    for eng_term, tr_list in INDUSTRIAL_DICT.items():
-        for tr_word in tr_list:
-            if tr_upper(tr_word) in query_clean:
-                logger.success(f"✅ Sözlük Eşleşmesi: '{tr_word}' -> '{eng_term}'")
-                return eng_term
-    return None
-
-# =========================================================
-# 🛠️ YARDIMCI ARAÇLAR
-# =========================================================
-def extract_code_from_text(text: str):
-    match = re.search(r'\b([A-Za-z0-9-]{3,})\b', text)
-    if match:
-        candidate = match.group(1)
-        if any(char.isdigit() for char in candidate) or "-" in candidate:
-            return candidate
-    return None
-
-# =========================================================
-# 🚦 INTENT CLASSIFIER
-# =========================================================
-async def classify_intent(text: str) -> dict:
-    system_prompt = """
-    Sen bir Router'sın. JSON dön.
-    1. DURUM: Parça arıyorsa "intent": "SEARCH". 
-       "query" alanına 'var mı', 'fiyat', 'lazım', 'arıyorum' gibi sohbet eklerini at.
-       ANCAK: Parçayı niteleyen sıfatları (Ara, Alt, Üst, Ön, Arka, Hareketli, Sabit, Sağ, Sol) ASLA SİLME.
-       Örn: "Ara kablo var mı" -> "query": "Ara kablo" (Doğru)
-       Örn: "Kablo var mı" -> "query": "Kablo"
-       Örn: "Alt bıçak fiyatı" -> "query": "Alt bıçak"
-       
-    2. DURUM: Sohbet ise "intent": "CHAT", "reply": "Parça aramaya hazırım".
+async def analyze_intent_with_gemini(text: str) -> dict:
     """
+    Kullanıcı mesajını analiz eder.
+    AMACIMIZ: Markayı ve Aranacak 'Saf Türkçe' parça ismini bulmak.
+    """
+    # 🚨 KRİTİK PROMPT: İngilizceye çeviriyi yasaklıyoruz.
+    system_prompt = """
+    GÖREV: Bir sanayi yedek parça asistanı olarak kullanıcı mesajını analiz et.
+    
+    ÇIKTI FORMATI (JSON):
+    {
+        "intent": "SEARCH" veya "CHAT" (Selamlaşma vs ise CHAT),
+        "brand": "Marka Varsa Buraya (TYPICAL, JUKI, YAMATO, PEGASUS, BROTHER...)",
+        "part_name": "Aranan Parçanın SAF TÜRKÇE ADI (Sıfatları at, kök ismi bul)",
+        "machine_group": "Makine Grubu (Reçme, Overlok, Düz...)"
+    }
+
+    KURALLAR:
+    1. ASLA İngilizceye çevirme. Kullanıcı "Vida" dediyse "VİDA" al. "SCREW" DEME!
+    2. Gereksiz kelimeleri at ("var mı", "fiyatı ne", "lazım", "acaba", "bulabilir misin").
+    3. ÖRNEKLER:
+       - "Typical vida var mı?" -> {"intent": "SEARCH", "brand": "TYPICAL", "part_name": "VİDA"}
+       - "Yamato reçme iğne bağı" -> {"intent": "SEARCH", "brand": "YAMATO", "part_name": "İĞNE BAĞI", "machine_group": "Reçme"}
+       - "B2424-354-000" -> {"intent": "SEARCH", "part_name": "B2424-354-000", "brand": null}
+       - "Selamun aleyküm" -> {"intent": "CHAT"}
+    """
+    
     payload = {
-        "contents": [{"parts": [{"text": system_prompt + f"\n\nMESAJ: {text}"}]}],
+        "contents": [{"parts": [{"text": system_prompt + f"\n\nKULLANICI MESAJI: {text}"}]}],
         "generationConfig": {"response_mime_type": "application/json"}
     }
+    
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(GEMINI_API_URL, json=payload) as resp:
                 if resp.status == 200:
                     res = await resp.json()
-                    return json.loads(res["candidates"][0]["content"]["parts"][0]["text"])
-    except:
-        return {"intent": "SEARCH", "query": text}
+                    text_resp = res["candidates"][0]["content"]["parts"][0]["text"]
+                    return json.loads(text_resp)
+                else:
+                    # API hatası olursa manuel fallback
+                    return {"intent": "SEARCH", "brand": None, "part_name": text, "machine_group": None}
+    except Exception as e:
+        logger.error(f"Router Hatası: {e}")
+        return {"intent": "SEARCH", "brand": None, "part_name": text, "machine_group": None}
 
 # =========================================================
 # 🧠 ANA CHAT ENDPOINT
 # =========================================================
-@router.post("/send")
-@router.post("/expert-chat") 
+@router.post("/send")        # Frontend uyumluluğu için
+@router.post("/expert-chat") # Backend testi için
 async def chat_endpoint(
     text: str = Form(None),   
     message: str = Form(None),
-    history: str = Form("[]") 
+    history: str = Form("[]") # Frontend gönderiyorsa hata vermesin diye ekledik
 ):
     try:
         user_query = text if text else message
-        if not user_query: return {"answer": "Boş mesaj gönderilemez ustam.", "reply": "Boş mesaj.", "sources": []}
+        if not user_query: 
+            return {"answer": "Boş mesaj.", "reply": "Boş mesaj.", "sources": []}
 
         logger.info(f"📨 [GİRİŞ] Mesaj: {user_query}")
 
-        # 1. NİYET ANALİZİ
-        intent_result = await classify_intent(user_query)
-        if intent_result.get("intent") == "CHAT":
-            reply_text = intent_result.get("reply", "Buyur ustam?")
-            return {"answer": reply_text, "reply": reply_text, "sources": []}
-
-        search_text = intent_result.get("query", user_query)
-        logger.info(f"🔎 Router: '{user_query}' -> '{search_text}'")
+        # 1. ANALİZ ET (Router)
+        analysis = await analyze_intent_with_gemini(user_query)
         
-        # 2. HAZIRLIK
-        extracted_code = extract_code_from_text(search_text)
-        english_term = search_in_dictionary(search_text) 
-        
-        # 3. FALLBACK
-        if not english_term and not extracted_code:
-            logger.info("🤷‍♂️ Sözlükte yok, Gemini'ye soruluyor...")
-            prompt = f"Identify technical English name for sewing part: '{search_text}'. Return ONLY term."
-            async with aiohttp.ClientSession() as session:
-                payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                async with session.post(GEMINI_API_URL, json=payload) as resp:
-                    if resp.status == 200:
-                        res = await resp.json()
-                        english_term = res["candidates"][0]["content"]["parts"][0]["text"].strip()
-        
-        # 4. ARAMA YAP
-        db_results = []
-        if extracted_code:
-            logger.info(f"🎯 Kod ile aranıyor: {extracted_code}")
-            res = await search_parts(search_text, strict_filter=extracted_code, k=5)
-            logger.info(f"   ↳ Kod: {len(res)}")
-            db_results.extend(res)
+        intent = analysis.get("intent", "CHAT")
+        extracted_brand = analysis.get("brand")
+        extracted_part = analysis.get("part_name") # Örn: "VİDA" (Artık Türkçe!)
+        extracted_group = analysis.get("machine_group")
 
-        if english_term:
-            logger.info(f"🌍 Çeviri ile aranıyor: {english_term}")
-            res = await search_parts(english_term, k=5)
-            logger.info(f"   ↳ Çeviri: {len(res)}")
-            db_results.extend(res)
+        # Eğer sohbet ise (Selam vs.) veya parça bulunamadıysa
+        if intent == "CHAT" or not extracted_part:
+            return {"answer": "Aleykümselam ustam. Hangi parçayı arıyorsun? Marka veya parça adı söyle, hemen depoya bakayım.", "reply": "Buyur ustam?", "sources": []}
+
+        logger.info(f"🇹🇷 Arama Yapılıyor -> Marka: {extracted_brand} | Parça: {extracted_part}")
+
+        # 2. VEKTÖR OLUŞTUR (ÇEVİRİ YOK! DİREKT TÜRKÇE)
+        # Senin sistemin burada 3072'lik vektör üretecek.
+        query_vector = get_text_embedding(extracted_part)
+
+        if not query_vector:
+            return {"answer": "Teknik bir sorun oldu, beyin (embedding) yanıt vermedi.", "reply": "Hata", "sources": []}
+
+        # 3. VERİTABANINDA ARA
+        # search_vector_db fonksiyonu services/vector_db.py içinde
+        results = await search_vector_db(
+            query_vector, 
+            brand_filter=extracted_brand, 
+            limit=5
+        )
         
-        res = await search_parts(search_text, k=3)
-        logger.info(f"   ↳ Türkçe: {len(res)}")
-        db_results.extend(res)
+        logger.success(f"📦 Sonuç Sayısı: {len(results)}")
 
-        # Tekilleştirme
-        unique_parts = {res['code']: res for res in db_results}.values()
-        logger.success(f"📦 TOPLAM TEKİL SONUÇ: {len(unique_parts)}")
+        # 4. CEVABI HAZIRLA
+        if not results:
+            msg = f"Ustam, '{extracted_part}' parçası için veritabanında uygun sonuç bulamadım. Marka ({extracted_brand}) doğru mu? Belki parça ismi farklıdır?"
+            return {"answer": msg, "reply": msg, "sources": []}
 
-        # 5. CEVAP OLUŞTUR
-        # Frontend için source listesi hazırlayalım (C# tarafında kullanılıyorsa)
-        sources_list = []
+        # Gemini'ye sunulacak metin ve Frontend için kaynak listesi
         context_lines = []
+        sources_list = []
         
-        if unique_parts:
-            for p in unique_parts:
-                safe_code = urllib.parse.quote(p['code'].strip())
-                buy_link = f"{SHOP_BASE_URL}{safe_code}"
-                
-                # AI Context için metin
-                line = f"- Kod: {p['code']} | Ad: {p['name']} | Sayfa: {p.get('page','?')} | Link: {buy_link}"
-                context_lines.append(line)
-                
-                # C# (Frontend) için obje
-                sources_list.append({
-                    "code": p['code'],
-                    "name": p['name'],
-                    "description": p.get('desc', ''),
-                    "page": p.get('page', ''),
-                    "buy_url": buy_link
-                })
-            context_text = "\n".join(context_lines)
-        else:
-            context_text = "Veritabanında bulunamadı."
+        for p in results:
+            # Pydantic model veya Dict gelebilir, garantileyelim
+            p_code = p.get('PartCode', '-')
+            p_name = p.get('PartName', 'Bilinmeyen')
+            p_brand = p.get('MachineBrand', '-')
+            p_model = p.get('MachineModel', '')
+            p_desc = p.get('Description', '')
+            
+            # Satın alma linki
+            safe_code = urllib.parse.quote(p_code.strip())
+            buy_link = f"{SHOP_BASE_URL}{safe_code}"
 
-        system_prompt = f"""
-        Sen Partalog AI, Sanayi Yedek Parça Uzmanısın.
-        SORU: "{user_query}"
-        BULUNAN PARÇALAR:
+            line = f"- Marka: {p_brand} | Model: {p_model} | Parça: {p_name} ({p_code}) | Detay: {p_desc}"
+            context_lines.append(line)
+            
+            sources_list.append({
+                "code": p_code,
+                "name": p_name,
+                "brand": p_brand,
+                "buy_url": buy_link,
+                "machine_model": p_model,
+                "description": p_desc
+            })
+
+        context_text = "\n".join(context_lines)
+
+        # 5. FİNAL CEVAP (USTA DİLİ)
+        final_prompt = f"""
+        Sen sanayi yedek parça uzmanısın (Partalog AI).
+        
+        KULLANICI SORUSU: "{user_query}"
+        
+        DEPODAN BULDUĞUN PARÇALAR:
         {context_text}
         
-        GÖREVİN:
-        1. En uygun parçayı öner. Kodunu, İsmini ve Sayfa Numarasını söyle.
-        2. Satın alma linki verebileceğini ima et.
-        3. Samimi bir usta dili kullan.
-        4. Parça yoksa dürüstçe "Katalogda yok" de.
+        GÖREV:
+        1. Kullanıcıya bulduğun parçaları listele.
+        2. Marka ve Model uyumuna dikkat çek (Örn: "Bu parça Typical GK335 için uygundur").
+        3. Samimi, kısa ve öz, usta ağzıyla konuş.
+        4. Link verme, zaten sistem gösterecek. Sadece doğru parçayı öner.
         """
 
-        payload = {"contents": [{"parts": [{"text": system_prompt}]}]}
         async with aiohttp.ClientSession() as session:
+            payload = {"contents": [{"parts": [{"text": final_prompt}]}]}
             async with session.post(GEMINI_API_URL, json=payload) as resp:
                 if resp.status == 200:
-                    res = await resp.json()
-                    final_reply = res["candidates"][0]["content"]["parts"][0]["text"]
+                    ai_reply = (await resp.json())["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    final_reply = "Aradığın parçaları buldum. Bunları mı arıyordun?."
+                    ai_reply = "Sonuçlar yukarıda listelendi ustam."
 
-        # 👇 KRİTİK NOKTA: HERKESİN GÖNLÜNÜ ALAN FORMAT
+        # Frontend formatı: answer, reply, sources
         return {
-            "answer": final_reply,  # Eski C# kodu bunu bekliyor olabilir
-            "reply": final_reply,   # Yeni standart
-            "sources": sources_list # Frontend kart göstermek isterse
+            "answer": ai_reply,
+            "reply": ai_reply,
+            "sources": sources_list
         }
 
     except Exception as e:
-        logger.error(f"🔥 Chat Hatası: {e}")
-        return {"answer": "Teknik bir hata oluştu ustam.", "reply": "Hata", "sources": []}
+        logger.error(f"Chat Hatası: {e}")
+        return {"answer": "Sistemsel bir hata oluştu ustam.", "reply": "Hata", "sources": []}
