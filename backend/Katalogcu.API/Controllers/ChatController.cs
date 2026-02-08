@@ -138,7 +138,7 @@ namespace Katalogcu.API.Controllers
                 // ✅ SEARCH intent + multi-part -> yan yana listele
                 if (string.Equals(intent, "SEARCH", StringComparison.OrdinalIgnoreCase) && multiTerms.Count > 1)
                 {
-                    var compareGroups = new List<CompareGroupDto>();
+                    List<CompareGroupDto> compareGroups;
 
                     // ✅ Prefer Python semantic sources when available
                     if (aiResponse.Sources != null && aiResponse.Sources.Any())
@@ -152,6 +152,7 @@ namespace Katalogcu.API.Controllers
                         if (groupedSources.Any())
                         {
                             // Process grouped Python sources
+                            compareGroups = new List<CompareGroupDto>();
                             foreach (var group in groupedSources)
                             {
                                 var products = await EnrichPythonSourcesAsync(group.ToList(), userId);
@@ -166,33 +167,13 @@ namespace Katalogcu.API.Controllers
                         else
                         {
                             // Python sources exist but no query field, fallback to term-based search
-                            foreach (var term in multiTerms)
-                            {
-                                var results = await SearchByCodeAsync(term, userId);
-                                var products = await EnrichResultsAsync(results, userId);
-
-                                compareGroups.Add(new CompareGroupDto
-                                {
-                                    Query = term,
-                                    Results = products
-                                });
-                            }
+                            compareGroups = await BuildCompareGroupsFromTermsAsync(multiTerms, userId);
                         }
                     }
                     else
                     {
                         // No Python sources, fallback to existing SearchByCodeAsync logic
-                        foreach (var term in multiTerms)
-                        {
-                            var results = await SearchByCodeAsync(term, userId);
-                            var products = await EnrichResultsAsync(results, userId);
-
-                            compareGroups.Add(new CompareGroupDto
-                            {
-                                Query = term,
-                                Results = products
-                            });
-                        }
+                        compareGroups = await BuildCompareGroupsFromTermsAsync(multiTerms, userId);
                     }
 
                     var anyResults = compareGroups.Any(g => g.Results.Any());
@@ -425,6 +406,25 @@ namespace Katalogcu.API.Controllers
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private async Task<List<CompareGroupDto>> BuildCompareGroupsFromTermsAsync(List<string> terms, Guid userId)
+        {
+            var compareGroups = new List<CompareGroupDto>();
+
+            foreach (var term in terms)
+            {
+                var results = await SearchByCodeAsync(term, userId);
+                var products = await EnrichResultsAsync(results, userId);
+
+                compareGroups.Add(new CompareGroupDto
+                {
+                    Query = term,
+                    Results = products
+                });
+            }
+
+            return compareGroups;
         }
 
         private async Task<List<EnrichedPartResult>> EnrichPythonSourcesAsync(List<ChatSourceDto> sources, Guid userId)
