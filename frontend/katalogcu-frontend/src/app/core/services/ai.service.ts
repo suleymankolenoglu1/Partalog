@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 // 🔥 GÜNCELLENDİ: Backend (ChatController) Response Yapısı
 // PublicViewComponent'te kullandığımız 'res.replySuggestion' ve 'res.products' ile eşleşmeli.
@@ -15,10 +16,7 @@ export interface AiChatResponse {
 })
 export class AiService {
   private http = inject(HttpClient);
-  
-  // ⚠️ NOT: Port numarasını CatalogService ile aynı (HTTPS) yaptım.
-  // Eğer HTTP kullanıyorsan 'http://localhost:5159/api/chat/ask' yapabilirsin.
-  private apiUrl = 'http://localhost:5159/api/chat/ask'; 
+  private apiUrl = `${environment.apiUrl}/chat/ask`;
 
   /**
    * AI'ya mesaj, resim ve sohbet geçmişini gönderir.

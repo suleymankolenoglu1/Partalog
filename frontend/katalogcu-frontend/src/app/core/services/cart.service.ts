@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { CatalogPageItem } from './catalog.service'; // 🔥 Doğru interface'i buradan alıyoruz
+import { environment } from '../../../environments/environment.development';
 
 export interface CartItem {
   product: CatalogPageItem; 
@@ -13,9 +14,7 @@ export interface CartItem {
 })
 export class CartService {
   private http = inject(HttpClient);
-  
-  // 🔥 Backend API Adresi (HTTPS Portu)
-  private apiUrl = 'http://localhost:5159/api'; 
+  private apiUrl = environment.apiUrl;
   private cartKey = 'partalog_cart';
 
   // --- STATE MANAGEMENT (Reactive) ---
