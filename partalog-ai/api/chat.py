@@ -1,9 +1,10 @@
 """
-Partalog AI - Chat API (Final v4.1 - Turkish Native Mode 🇹🇷)
+Partalog AI - Chat API (Final v4.2 - Turkish Native Mode 🇹🇷)
 ------------------------------------------------
 1. NO DICTIONARY: Sözlük iptal. "SCREW" yok, "VİDA" var.
 2. NATIVE SEARCH: Kullanıcı ne derse o aranır (3072 Vektör).
 3. SMART ROUTER: Marka ve Parça ismini ayıklar.
+4. MULTI-PART: Birden fazla parça istenirse "parts" listesi döndürür.
 """
 
 import aiohttp
@@ -15,7 +16,6 @@ from config import settings
 
 # ✅ Gerekli Servisler
 from services.embedding import get_text_embedding 
-# 🛠️ DÜZELTME: Artık 'services' klasöründen çağ��rıyoruz
 from services.vector_db import search_vector_db 
 
 router = APIRouter()
@@ -41,6 +41,10 @@ async def analyze_intent_with_gemini(text: str) -> dict:
         "brand": "Marka Varsa Buraya (TYPICAL, JUKI, YAMATO, PEGASUS, BROTHER...)",
         "part_name": "Aranan Parçanın SAF TÜRKÇE ADI (Sıfatları at, kök ismi bul)",
         "part_code": "Parça kodu varsa buraya (örn: B2424-354-000)",
+        "parts": [
+          {"part_name": "...", "part_code": null},
+          {"part_name": "...", "part_code": null}
+        ],
         "machine_group": "Makine Grubu (Reçme, Overlok, Düz...)",
         "confidence": 0.0-1.0 arasında bir güven skoru
     }
@@ -48,7 +52,9 @@ async def analyze_intent_with_gemini(text: str) -> dict:
     KURALLAR:
     1. ASLA İngilizceye çevirme. Kullanıcı "Vida" dediyse "VİDA" al. "SCREW" DEME!
     2. Gereksiz kelimeleri at ("var mı", "fiyatı ne", "lazım", "acaba", "bulabilir misin").
-    3. KULLANIM:
+    3. Birden fazla parça varsa "parts" listesine hepsini koy.
+       - Tek parça varsa bile parts[0] doldur.
+    4. KULLANIM:
        - Eğer fiyat soruluyorsa intent = "PRICE"
        - Eğer stok soruluyorsa intent = "STOCK"
        - Eğer uyumluluk soruluyorsa intent = "COMPATIBILITY"
@@ -56,11 +62,11 @@ async def analyze_intent_with_gemini(text: str) -> dict:
        - Eğer karşılaştırma isteniyorsa intent = "COMPARE"
        - Selamlaşma vs ise intent = "CHAT"
        - Parça araması ise intent = "SEARCH"
-    4. ÖRNEKLER:
-       - "Typical vida var mı?" -> {"intent":"SEARCH","brand":"TYPICAL","part_name":"VİDA","part_code":null,"machine_group":null,"confidence":0.85}
-       - "Yamato reçme iğne bağı" -> {"intent":"SEARCH","brand":"YAMATO","part_name":"İĞNE BAĞI","machine_group":"Reçme","confidence":0.86}
-       - "B2424-354-000 fiyatı ne?" -> {"intent":"PRICE","part_name":"B2424-354-000","part_code":"B2424-354-000","confidence":0.90}
-       - "Bu parça hangi makinelere uyar?" -> {"intent":"COMPATIBILITY","part_name":"PARÇA","confidence":0.70}
+    5. ÖRNEKLER:
+       - "Typical vida var mı?" -> {"intent":"SEARCH","brand":"TYPICAL","part_name":"VİDA","parts":[{"part_name":"VİDA","part_code":null}],"part_code":null,"machine_group":null,"confidence":0.85}
+       - "Juki çağanoz ve motor kayışı var mı?" -> {"intent":"SEARCH","brand":"JUKI","parts":[{"part_name":"ÇAĞANOZ","part_code":null},{"part_name":"MOTOR KAYIŞI","part_code":null}],"confidence":0.86}
+       - "B2424-354-000 fiyatı ne?" -> {"intent":"PRICE","part_name":"B2424-354-000","part_code":"B2424-354-000","parts":[{"part_name":"B2424-354-000","part_code":"B2424-354-000"}],"confidence":0.90}
+       - "Bu parça hangi makinelere uyar?" -> {"intent":"COMPATIBILITY","part_name":"PARÇA","parts":[{"part_name":"PARÇA","part_code":null}],"confidence":0.70}
        - "Selamun aleyküm" -> {"intent":"CHAT","confidence":0.95}
     """
     payload = {
@@ -76,21 +82,29 @@ async def analyze_intent_with_gemini(text: str) -> dict:
                     text_resp = res["candidates"][0]["content"]["parts"][0]["text"]
                     return json.loads(text_resp)
                 else:
-                    # API hatası olursa manuel fallback
                     return {"intent": "SEARCH", "brand": None, "part_name": text, "machine_group": None}
     except Exception as e:
         logger.error(f"Router Hatası: {e}")
         return {"intent": "SEARCH", "brand": None, "part_name": text, "machine_group": None}
 
+def split_terms(text: str):
+    if not text:
+        return []
+    seps = [" ve ", " & ", ",", ";", "/", " ile "]
+    parts = [text]
+    for sep in seps:
+        parts = [p for chunk in parts for p in chunk.split(sep)]
+    return [p.strip() for p in parts if p.strip()]
+
 # =========================================================
 # 🧠 ANA CHAT ENDPOINT
 # =========================================================
-@router.post("/send")        # Frontend uyumluluğu için
-@router.post("/expert-chat") # Backend testi için
+@router.post("/send")
+@router.post("/expert-chat")
 async def chat_endpoint(
     text: str = Form(None),   
     message: str = Form(None),
-    history: str = Form("[]") # Frontend gönderiyorsa hata vermesin diye ekledik
+    history: str = Form("[]")
 ):
     try:
         user_query = text if text else message
@@ -104,8 +118,24 @@ async def chat_endpoint(
         
         intent = analysis.get("intent", "CHAT")
         extracted_brand = analysis.get("brand")
-        extracted_part = analysis.get("part_name") # Örn: "VİDA" (Artık Türkçe!)
+        extracted_part = analysis.get("part_name")
         extracted_group = analysis.get("machine_group")
+
+        # ✅ parts normalizasyonu
+        parts = analysis.get("parts")
+        if not parts:
+            if extracted_part:
+                parts = [{"part_name": extracted_part, "part_code": analysis.get("part_code")}]
+            else:
+                parts = []
+
+        # ✅ Gemini kaçırırsa fallback split
+        if len(parts) <= 1 and intent == "SEARCH":
+            fallback_parts = split_terms(user_query)
+            if len(fallback_parts) > 1:
+                parts = [{"part_name": p, "part_code": None} for p in fallback_parts]
+
+        analysis["parts"] = parts
 
         # Eğer sohbet ise (Selam vs.) veya parça bulunamadıysa
         if intent == "CHAT" or not extracted_part:
@@ -116,10 +146,54 @@ async def chat_endpoint(
                 "debug_intent": analysis
             }
 
+        # ✅ Multi-part varsa her parça için ayrı arama yap
+        if intent == "SEARCH" and len(parts) > 1:
+            all_sources = []
+            for part in parts:
+                part_name = part.get("part_name")
+                if not part_name:
+                    continue
+
+                query_vector = get_text_embedding(part_name)
+                if not query_vector:
+                    continue
+
+                results = await search_vector_db(
+                    query_vector, 
+                    brand_filter=extracted_brand, 
+                    limit=5
+                )
+
+                for p in results:
+                    p_code = p.get('PartCode', '-')
+                    p_name = p.get('PartName', 'Bilinmeyen')
+                    p_brand = p.get('MachineBrand', '-')
+                    p_model = p.get('MachineModel', '')
+                    p_desc = p.get('Description', '')
+                    
+                    safe_code = urllib.parse.quote(p_code.strip())
+                    buy_link = f"{SHOP_BASE_URL}{safe_code}"
+
+                    all_sources.append({
+                        "code": p_code,
+                        "name": p_name,
+                        "brand": p_brand,
+                        "buy_url": buy_link,
+                        "machine_model": p_model,
+                        "description": p_desc,
+                        "query": part_name
+                    })
+
+            if not all_sources:
+                msg = "Ustam, birden fazla parça istedin ama uygun sonuç çıkmadı."
+                return {"answer": msg, "reply": msg, "sources": [], "debug_intent": analysis}
+
+            msg = "Birden fazla parça için sonuçları ayrı ayrı listeliyorum ustam."
+            return {"answer": msg, "reply": msg, "sources": all_sources, "debug_intent": analysis}
+
         logger.info(f"🇹🇷 Arama Yapılıyor -> Marka: {extracted_brand} | Parça: {extracted_part}")
 
-        # 2. VEKTÖR OLUŞTUR (ÇEVİRİ YOK! DİREKT TÜRKÇE)
-        # Senin sistemin burada 3072'lik vektör üretecek.
+        # 2. VEKTÖR OLUŞTUR
         query_vector = get_text_embedding(extracted_part)
 
         if not query_vector:
@@ -131,7 +205,6 @@ async def chat_endpoint(
             }
 
         # 3. VERİTABANINDA ARA
-        # search_vector_db fonksiyonu services/vector_db.py içinde
         results = await search_vector_db(
             query_vector, 
             brand_filter=extracted_brand, 
@@ -150,14 +223,12 @@ async def chat_endpoint(
         sources_list = []
         
         for p in results:
-            # Pydantic model veya Dict gelebilir, garantileyelim
             p_code = p.get('PartCode', '-')
             p_name = p.get('PartName', 'Bilinmeyen')
             p_brand = p.get('MachineBrand', '-')
             p_model = p.get('MachineModel', '')
             p_desc = p.get('Description', '')
             
-            # Satın alma linki
             safe_code = urllib.parse.quote(p_code.strip())
             buy_link = f"{SHOP_BASE_URL}{safe_code}"
 
@@ -175,7 +246,7 @@ async def chat_endpoint(
 
         context_text = "\n".join(context_lines)
 
-        # 5. FİNAL CEVAP (USTA DİLİ)
+        # 5. FİNAL CEVAP
         final_prompt = f"""
         Sen sanayi yedek parça uzmanısın (Partalog AI).
         
@@ -186,9 +257,9 @@ async def chat_endpoint(
         
         GÖREV:
         1. Kullanıcıya bulduğun parçaları listele.
-        2. Marka ve Model uyumuna dikkat çek (Örn: "Bu parça Typical GK335 için uygundur").
+        2. Marka ve Model uyumuna dikkat çek.
         3. Samimi, kısa ve öz, usta ağzıyla konuş.
-        4. Link verme, zaten sistem gösterecek. Sadece doğru parçayı öner.
+        4. Link verme, zaten sistem gösterecek.
         """
 
         async with aiohttp.ClientSession() as session:
@@ -199,7 +270,6 @@ async def chat_endpoint(
                 else:
                     ai_reply = "Sonuçlar yukarıda listelendi ustam."
 
-        # Frontend formatı: answer, reply, sources
         return {
             "answer": ai_reply,
             "reply": ai_reply,

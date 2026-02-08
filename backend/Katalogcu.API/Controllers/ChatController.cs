@@ -92,6 +92,7 @@ namespace Katalogcu.API.Controllers
                 string? intent = null;
                 string? partCode = null;
                 double? confidence = null;
+                List<string> multiTerms = new();
 
                 if (aiResponse.DebugIntent is JsonElement intentElement)
                 {
@@ -101,6 +102,9 @@ namespace Katalogcu.API.Controllers
 
                     if (intentElement.TryGetProperty("confidence", out var cf) && cf.ValueKind == JsonValueKind.Number)
                         confidence = cf.GetDouble();
+
+                    // ✅ Multi-part yakalama (parts[])
+                    multiTerms = ExtractPartsFromDebugIntent(intentElement);
                 }
 
                 if (confidence.HasValue && confidence.Value < 0.60)
@@ -128,6 +132,36 @@ namespace Katalogcu.API.Controllers
                         ReplySuggestion = "Ustam, hangi bilgiyi istersin? (fiyat, stok, uyumluluk, parça kodu) diye sor.",
                         Products = new List<EnrichedPartResult>(),
                         DebugInfo = $"Intent: HELP | Confidence: {confidence?.ToString("0.00") ?? "n/a"}"
+                    });
+                }
+
+                // ✅ SEARCH intent + multi-part -> yan yana listele
+                if (string.Equals(intent, "SEARCH", StringComparison.OrdinalIgnoreCase) && multiTerms.Count > 1)
+                {
+                    var compareGroups = new List<CompareGroupDto>();
+
+                    foreach (var term in multiTerms)
+                    {
+                        var results = await SearchByCodeAsync(term, userId);
+                        var products = await EnrichResultsAsync(results, userId);
+
+                        compareGroups.Add(new CompareGroupDto
+                        {
+                            Query = term,
+                            Results = products
+                        });
+                    }
+
+                    var anyResults = compareGroups.Any(g => g.Results.Any());
+
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = anyResults
+                            ? "Birden fazla parça için sonuçları ayrı ayrı listeledim."
+                            : "Birden fazla parça istedin ama uygun sonuç bulamadım.",
+                        Products = new List<EnrichedPartResult>(),
+                        CompareGroups = compareGroups,
+                        DebugInfo = $"Intent: SEARCH | Terms: {string.Join(", ", multiTerms)}"
                     });
                 }
 
@@ -301,6 +335,38 @@ namespace Katalogcu.API.Controllers
         }
 
         // --- YARDIMCI METODLAR ---
+
+        private static List<string> ExtractPartsFromDebugIntent(JsonElement intentElement)
+        {
+            var terms = new List<string>();
+
+            if (intentElement.TryGetProperty("parts", out var parts) && parts.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var part in parts.EnumerateArray())
+                {
+                    if (part.TryGetProperty("part_code", out var pc) && pc.ValueKind == JsonValueKind.String)
+                    {
+                        var value = pc.GetString();
+                        if (!string.IsNullOrWhiteSpace(value))
+                        {
+                            terms.Add(value);
+                            continue;
+                        }
+                    }
+
+                    if (part.TryGetProperty("part_name", out var pn) && pn.ValueKind == JsonValueKind.String)
+                    {
+                        var value = pn.GetString();
+                        if (!string.IsNullOrWhiteSpace(value))
+                        {
+                            terms.Add(value);
+                        }
+                    }
+                }
+            }
+
+            return terms.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
 
         private static List<string> ExtractCompareTerms(string? text)
         {
