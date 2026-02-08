@@ -87,11 +87,142 @@ namespace Katalogcu.API.Controllers
                 // 3. AI Analizi (Python)
                 var aiResponse = await _aiService.GetExpertChatResponseAsync(aiRequest);
 
-                // --- NİYET ANALİZİ ---
+                // --- NİYET ANALİZİ (Yeni yapı) ---
                 string? searchTerm = null;
+                string? intent = null;
+                string? partCode = null;
+                double? confidence = null;
+
                 if (aiResponse.DebugIntent is JsonElement intentElement)
                 {
-                    if (intentElement.TryGetProperty("search_term", out var st)) searchTerm = st.GetString();
+                    if (intentElement.TryGetProperty("intent", out var it)) intent = it.GetString();
+                    if (intentElement.TryGetProperty("part_name", out var pn)) searchTerm = pn.GetString();
+                    if (intentElement.TryGetProperty("part_code", out var pc)) partCode = pc.GetString();
+
+                    if (intentElement.TryGetProperty("confidence", out var cf) && cf.ValueKind == JsonValueKind.Number)
+                        confidence = cf.GetDouble();
+                }
+
+                if (confidence.HasValue && confidence.Value < 0.60)
+                {
+                    _logger.LogWarning("Low intent confidence: {Confidence} | Intent: {Intent} | Text: {Text}",
+                        confidence.Value, intent ?? "n/a", request.Text);
+                }
+
+                // CHAT intent’te arama yapma
+                if (string.Equals(intent, "CHAT", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = aiResponse.Answer ?? "Buyur ustam?",
+                        Products = new List<EnrichedPartResult>(),
+                        DebugInfo = $"Intent: {intent} | Confidence: {confidence?.ToString("0.00") ?? "n/a"}"
+                    });
+                }
+
+                // ✅ HELP intent
+                if (string.Equals(intent, "HELP", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = "Ustam, hangi bilgiyi istersin? (fiyat, stok, uyumluluk, parça kodu) diye sor.",
+                        Products = new List<EnrichedPartResult>(),
+                        DebugInfo = $"Intent: HELP | Confidence: {confidence?.ToString("0.00") ?? "n/a"}"
+                    });
+                }
+
+                // ✅ Intent bazlı özel akışlar
+                var intentQuery = partCode ?? searchTerm ?? request.Text;
+
+                if (string.Equals(intent, "PRICE", StringComparison.OrdinalIgnoreCase))
+                {
+                    var priceResults = await SearchByCodeAsync(intentQuery, userId);
+                    var priceProducts = await EnrichResultsAsync(priceResults, userId);
+
+                    if (!priceProducts.Any())
+                    {
+                        return Ok(new ChatResponseDto
+                        {
+                            ReplySuggestion = "Fiyat için uygun parça bulamadım. Kod veya isim net mi?",
+                            Products = new List<EnrichedPartResult>(),
+                            DebugInfo = $"Intent: PRICE | Code: {intentQuery}"
+                        });
+                    }
+
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = $"Fiyat bilgisi bulunan {priceProducts.Count} parça buldum.",
+                        Products = priceProducts,
+                        DebugInfo = $"Intent: PRICE | Code: {intentQuery}"
+                    });
+                }
+
+                if (string.Equals(intent, "STOCK", StringComparison.OrdinalIgnoreCase))
+                {
+                    var stockResults = await SearchByCodeAsync(intentQuery, userId);
+                    var stockProducts = await EnrichResultsAsync(stockResults, userId);
+
+                    if (!stockProducts.Any())
+                    {
+                        return Ok(new ChatResponseDto
+                        {
+                            ReplySuggestion = "Stok için uygun parça bulamadım.",
+                            Products = new List<EnrichedPartResult>(),
+                            DebugInfo = $"Intent: STOCK | Code: {intentQuery}"
+                        });
+                    }
+
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = "Stok durumlarını listeledim.",
+                        Products = stockProducts,
+                        DebugInfo = $"Intent: STOCK | Code: {intentQuery}"
+                    });
+                }
+
+                if (string.Equals(intent, "COMPATIBILITY", StringComparison.OrdinalIgnoreCase))
+                {
+                    var compResults = await SearchByCodeAsync(intentQuery, userId);
+                    var compProducts = await EnrichResultsAsync(compResults, userId);
+
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = compProducts.Any()
+                            ? "Uyumlu model bilgilerini listeledim."
+                            : "Uyumluluk için parça bulunamadı.",
+                        Products = compProducts,
+                        DebugInfo = $"Intent: COMPATIBILITY | Code: {intentQuery}"
+                    });
+                }
+
+                if (string.Equals(intent, "COMPARE", StringComparison.OrdinalIgnoreCase))
+                {
+                    var compareQuery = partCode ?? searchTerm ?? request.Text;
+                    var terms = ExtractCompareTerms(compareQuery);
+
+                    var compareGroups = new List<CompareGroupDto>();
+
+                    foreach (var term in terms)
+                    {
+                        var compareResults = await SearchByCodeAsync(term, userId);
+                        var compareProducts = await EnrichResultsAsync(compareResults, userId);
+
+                        compareGroups.Add(new CompareGroupDto
+                        {
+                            Query = term,
+                            Results = compareProducts
+                        });
+                    }
+
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = compareGroups.Any()
+                            ? "Karşılaştırma için parçaları yan yana listeledim."
+                            : "Karşılaştırma için uygun parça bulamadım.",
+                        Products = new List<EnrichedPartResult>(),
+                        CompareGroups = compareGroups,
+                        DebugInfo = $"Intent: COMPARE | Terms: {string.Join(", ", terms)}"
+                    });
                 }
 
                 // 4. PARÇA LİSTESİ HAZIRLIĞI
@@ -103,6 +234,11 @@ namespace Katalogcu.API.Controllers
                     finalProducts = await EnrichPythonSourcesAsync(aiResponse.Sources, userId);
                 }
                 // SENARYO B: Python bulamadıysa ama Kod yakaladıysa
+                else if (!string.IsNullOrWhiteSpace(partCode) && IsPartNumber(partCode))
+                {
+                    var fallbackResults = await SearchByCodeAsync(partCode, userId);
+                    finalProducts = await EnrichResultsAsync(fallbackResults, userId);
+                }
                 else if (!string.IsNullOrWhiteSpace(searchTerm) && IsPartNumber(searchTerm))
                 {
                     var fallbackResults = await SearchByCodeAsync(searchTerm, userId);
@@ -154,7 +290,7 @@ namespace Katalogcu.API.Controllers
                 {
                     ReplySuggestion = aiResponse.Answer ?? "Üzgünüm, sonuç bulunamadı.",
                     Products = finalProducts,
-                    DebugInfo = $"Search: {searchTerm ?? "Yok"}"
+                    DebugInfo = $"Intent: {intent ?? "Yok"} | Search: {searchTerm ?? "Yok"} | Code: {partCode ?? "Yok"} | Confidence: {confidence?.ToString("0.00") ?? "n/a"}"
                 });
             }
             catch (Exception ex)
@@ -165,6 +301,22 @@ namespace Katalogcu.API.Controllers
         }
 
         // --- YARDIMCI METODLAR ---
+
+        private static List<string> ExtractCompareTerms(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return new List<string>();
+
+            var separators = new[] { " ve ", " & ", ",", ";", "/" };
+            var parts = separators.Aggregate(new List<string> { text }, (list, sep) =>
+                list.SelectMany(x => x.Split(sep, StringSplitOptions.RemoveEmptyEntries)).ToList()
+            );
+
+            return parts
+                .Select(p => p.Trim())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
         private async Task<List<EnrichedPartResult>> EnrichPythonSourcesAsync(List<ChatSourceDto> sources, Guid userId)
         {
@@ -316,6 +468,15 @@ namespace Katalogcu.API.Controllers
         public string ReplySuggestion { get; init; } = string.Empty;
         public List<EnrichedPartResult> Products { get; init; } = new();
         public string? DebugInfo { get; init; }
+
+        // ✅ Yan yana karşılaştırma için
+        public List<CompareGroupDto>? CompareGroups { get; init; }
+    }
+
+    public record CompareGroupDto
+    {
+        public string Query { get; init; } = string.Empty;
+        public List<EnrichedPartResult> Results { get; init; } = new();
     }
 
     public record EnrichedPartResult
