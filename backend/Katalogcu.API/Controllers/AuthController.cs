@@ -32,7 +32,6 @@ namespace Katalogcu.API.Controllers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
             // 2. Kullanıcı yoksa veya şifre yanlışsa hata dön
-            // (Not: Şimdilik şifreyi düz metin kontrol ediyoruz, ilerde Hashleyeceğiz)
             if (user == null || user.PasswordHash != request.Password)
             {
                 return Unauthorized(new { message = "Email veya şifre hatalı!" });
@@ -50,7 +49,7 @@ namespace Katalogcu.API.Controllers
                     new Claim(ClaimTypes.Email, user.Email),
                     new Claim(ClaimTypes.Role, user.Role)
                 }),
-                Expires = DateTime.UtcNow.AddDays(7), // Token 7 gün geçerli
+                Expires = DateTime.UtcNow.AddDays(7),
                 Issuer = _configuration["JwtSettings:Issuer"],
                 Audience = _configuration["JwtSettings:Audience"],
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -59,36 +58,41 @@ namespace Katalogcu.API.Controllers
             var token = tokenHandler.CreateToken(tokenDescriptor);
             var tokenString = tokenHandler.WriteToken(token);
 
-            // 4. Token'ı ve kullanıcı bilgisini dön
+            // 4. Token'ı ve kullanıcı bilgisini dön (id + userId garanti)
             return Ok(new 
             { 
-                Token = tokenString, 
-                User = new { user.Id, user.FirstName, user.LastName, user.Email, user.Role } 
+                token = tokenString, 
+                user = new 
+                { 
+                    id = user.Id,
+                    userId = user.Id,
+                    firstName = user.FirstName, 
+                    lastName = user.LastName, 
+                    email = user.Email, 
+                    role = user.Role 
+                } 
             });
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            // 1. Bu email daha önce alınmış mı kontrol et
             if (await _context.Users.AnyAsync(u => u.Email == request.Email))
             {
                 return BadRequest(new { message = "Bu e-posta adresi zaten kayıtlı!" });
             }
 
-            // 2. İsim Soyisim Ayrıştırma (Basit yöntem)
             var names = request.FullName.Split(' ', 2);
             var firstName = names[0];
             var lastName = names.Length > 1 ? names[1] : "";
 
-            // 3. Yeni Kullanıcı Oluştur
             var newUser = new AppUser
             {
                 FirstName = firstName,
                 LastName = lastName,
                 Email = request.Email,
-                PasswordHash = request.Password, // Not: Gerçek projede burası Hash'lenmeli (BCrypt vb.)
-                Role = "Customer", // Varsayılan rol Müşteri
+                PasswordHash = request.Password,
+                Role = "Customer",
                 CreatedDate = DateTime.UtcNow
             };
 

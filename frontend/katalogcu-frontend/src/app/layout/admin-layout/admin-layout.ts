@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service'; // Yolun doğru olduğundan emin ol
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-admin-layout',
@@ -11,13 +11,15 @@ import { AuthService } from '../../core/services/auth.service'; // Yolun doğru 
   styleUrl: './admin-layout.css'
 })
 export class AdminLayoutComponent {
-  // Auth servisini içeri alıyoruz
   private authService = inject(AuthService);
 
   isSidebarOpen = true;
-  userId = this.authService.getUserId();
+  userId: string | null = null;
 
-  // HTML'deki (click)="logout()" olayının çağırdığı fonksiyon
+  constructor() {
+    this.userId = this.authService.getUserId();
+  }
+
   logout() {
     this.authService.logout();
   }

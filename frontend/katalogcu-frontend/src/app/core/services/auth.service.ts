@@ -25,6 +25,7 @@ export class AuthService {
       })
     );
   }
+
   register(userData: { fullName: string; email: string; password: string }) {
     return this.http.post<any>(`${this.apiUrl}/auth/register`, userData);
   }
@@ -46,14 +47,25 @@ export class AuthService {
     return localStorage.getItem('auth_token');
   }
 
-  // ✅ UserId'yi getir
+  // ✅ UserId'yi getir (user_info yoksa token'dan al)
   getUserId(): string | null {
     const raw = localStorage.getItem('user_info');
-    if (!raw) return null;
+    if (raw) {
+      try {
+        const user = JSON.parse(raw);
+        if (user?.id) return user.id;
+        if (user?.userId) return user.userId;
+      } catch {
+        // ignore
+      }
+    }
+
+    const token = this.getToken();
+    if (!token) return null;
 
     try {
-      const user = JSON.parse(raw);
-      return user?.id ?? null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload?.nameid || payload?.sub || payload?.userId || null;
     } catch {
       return null;
     }

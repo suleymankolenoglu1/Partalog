@@ -51,6 +51,20 @@ namespace Katalogcu.API.Controllers
                     return BadRequest("Kullanıcı bilgisi bulunamadı.");
                 }
 
+                _logger.LogInformation("Chat request userId: {UserId}", userId);
+
+                // ✅ Katalog yoksa direkt boş dön
+                var hasCatalogs = await _context.Catalogs.AsNoTracking().AnyAsync(c => c.UserId == userId);
+                if (!hasCatalogs)
+                {
+                    return Ok(new ChatResponseDto
+                    {
+                        ReplySuggestion = "Bu mağazada henüz katalog yok.",
+                        Products = new List<EnrichedPartResult>(),
+                        DebugInfo = "No catalogs for user"
+                    });
+                }
+
                 // 1. History Parse
                 var chatHistory = new List<ChatMessageDto>();
                 if (!string.IsNullOrEmpty(request.History))
