@@ -11,6 +11,14 @@ interface AiResponse {
   replySuggestion: string; // Eskiden 'text' idi
   products: any[];         // Eskiden 'suggestedParts' idi
   debugInfo?: string;      // Yeni eklendi
+
+  // ✅ Compare için yan yana gruplar
+  compareGroups?: CompareGroup[];
+}
+
+interface CompareGroup {
+  query: string;
+  results: any[];
 }
 
 @Component({
@@ -153,6 +161,20 @@ export class PublicViewComponent implements OnInit {
             price: part.price,
             stockStatus: part.stockStatus || 'Stokta Yok', 
             imageUrl: part.imageUrl
+          })),
+          compareGroups: (res.compareGroups || []).map((group: any) => ({
+            query: group.query,
+            results: (group.results || []).map((part: any) => ({
+              id: part.id,
+              code: part.code,
+              name: part.name,
+              description: part.description, 
+              catalogId: part.catalogId, 
+              pageNumber: part.pageNumber || '1',
+              price: part.price,
+              stockStatus: part.stockStatus || 'Stokta Yok', 
+              imageUrl: part.imageUrl
+            }))
           })),
           debugInfo: res.debugInfo
         };

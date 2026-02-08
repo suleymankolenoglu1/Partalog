@@ -121,7 +121,39 @@
                         {{ aiState.response.replySuggestion }}
                     </div>
 
-                    @if(aiState.response.products && aiState.response.products.length > 0) {
+                    @if(aiState.response.compareGroups && aiState.response.compareGroups.length > 0) {
+                        <div class="mt-6 border-t border-gray-100 pt-4">
+                            <div class="grid gap-4"
+                                 [ngStyle]="{'grid-template-columns': 'repeat(' + aiState.response.compareGroups.length + ', minmax(0,1fr))'}">
+                                
+                                @for(group of aiState.response.compareGroups; track $index) {
+                                    <div class="rounded-xl border border-[#E5E5EA] p-4 bg-[#FAFAFA]">
+                                        <div class="font-bold text-sm text-[#1D1D1F] mb-3">
+                                            {{ group.query }}
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            @for(part of group.results; track $index) {
+                                                <div class="p-3 rounded-lg border border-[#E5E5EA] bg-white">
+                                                    <div class="flex justify-between items-start">
+                                                        <div class="font-bold text-sm truncate text-[#1D1D1F]">{{ part.code }}</div>
+                                                        @if(part.price) {
+                                                            <div class="text-xs font-bold text-[#0066CC]">{{ part.price | currency:'TRY':'symbol-narrow' }}</div>
+                                                        }
+                                                    </div>
+                                                    <div class="text-xs text-[#86868B]">{{ part.name }}</div>
+                                                    <div class="text-[11px] text-[#86868B] mt-1">{{ part.stockStatus }}</div>
+                                                </div>
+                                            }
+                                            @if(!group.results || group.results.length === 0) {
+                                                <div class="text-xs text-[#86868B]">Sonuç bulunamadı.</div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    } @else if(aiState.response.products && aiState.response.products.length > 0) {
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-100">
                             @for(part of aiState.response.products; track $index) {
                                 <div class="flex items-center gap-3 p-3 rounded-xl border border-[#E5E5EA] bg-white hover:border-[#0066CC] hover:shadow-md transition-all group">

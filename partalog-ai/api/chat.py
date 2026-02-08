@@ -15,7 +15,7 @@ from config import settings
 
 # ✅ Gerekli Servisler
 from services.embedding import get_text_embedding 
-# 🛠️ DÜZELTME: Artık 'services' klasöründen çağırıyoruz
+# 🛠️ DÜZELTME: Artık 'services' klasöründen çağ��rıyoruz
 from services.vector_db import search_vector_db 
 
 router = APIRouter()
@@ -32,28 +32,37 @@ async def analyze_intent_with_gemini(text: str) -> dict:
     Kullanıcı mesajını analiz eder.
     AMACIMIZ: Markayı ve Aranacak 'Saf Türkçe' parça ismini bulmak.
     """
-    # 🚨 KRİTİK PROMPT: İngilizceye çeviriyi yasaklıyoruz.
     system_prompt = """
     GÖREV: Bir sanayi yedek parça asistanı olarak kullanıcı mesajını analiz et.
     
     ÇIKTI FORMATI (JSON):
     {
-        "intent": "SEARCH" veya "CHAT" (Selamlaşma vs ise CHAT),
+        "intent": "SEARCH" | "CHAT" | "PRICE" | "STOCK" | "COMPATIBILITY" | "HELP" | "COMPARE",
         "brand": "Marka Varsa Buraya (TYPICAL, JUKI, YAMATO, PEGASUS, BROTHER...)",
         "part_name": "Aranan Parçanın SAF TÜRKÇE ADI (Sıfatları at, kök ismi bul)",
-        "machine_group": "Makine Grubu (Reçme, Overlok, Düz...)"
+        "part_code": "Parça kodu varsa buraya (örn: B2424-354-000)",
+        "machine_group": "Makine Grubu (Reçme, Overlok, Düz...)",
+        "confidence": 0.0-1.0 arasında bir güven skoru
     }
 
     KURALLAR:
     1. ASLA İngilizceye çevirme. Kullanıcı "Vida" dediyse "VİDA" al. "SCREW" DEME!
     2. Gereksiz kelimeleri at ("var mı", "fiyatı ne", "lazım", "acaba", "bulabilir misin").
-    3. ÖRNEKLER:
-       - "Typical vida var mı?" -> {"intent": "SEARCH", "brand": "TYPICAL", "part_name": "VİDA"}
-       - "Yamato reçme iğne bağı" -> {"intent": "SEARCH", "brand": "YAMATO", "part_name": "İĞNE BAĞI", "machine_group": "Reçme"}
-       - "B2424-354-000" -> {"intent": "SEARCH", "part_name": "B2424-354-000", "brand": null}
-       - "Selamun aleyküm" -> {"intent": "CHAT"}
+    3. KULLANIM:
+       - Eğer fiyat soruluyorsa intent = "PRICE"
+       - Eğer stok soruluyorsa intent = "STOCK"
+       - Eğer uyumluluk soruluyorsa intent = "COMPATIBILITY"
+       - Eğer açıklama/yardım isteniyorsa intent = "HELP"
+       - Eğer karşılaştırma isteniyorsa intent = "COMPARE"
+       - Selamlaşma vs ise intent = "CHAT"
+       - Parça araması ise intent = "SEARCH"
+    4. ÖRNEKLER:
+       - "Typical vida var mı?" -> {"intent":"SEARCH","brand":"TYPICAL","part_name":"VİDA","part_code":null,"machine_group":null,"confidence":0.85}
+       - "Yamato reçme iğne bağı" -> {"intent":"SEARCH","brand":"YAMATO","part_name":"İĞNE BAĞI","machine_group":"Reçme","confidence":0.86}
+       - "B2424-354-000 fiyatı ne?" -> {"intent":"PRICE","part_name":"B2424-354-000","part_code":"B2424-354-000","confidence":0.90}
+       - "Bu parça hangi makinelere uyar?" -> {"intent":"COMPATIBILITY","part_name":"PARÇA","confidence":0.70}
+       - "Selamun aleyküm" -> {"intent":"CHAT","confidence":0.95}
     """
-    
     payload = {
         "contents": [{"parts": [{"text": system_prompt + f"\n\nKULLANICI MESAJI: {text}"}]}],
         "generationConfig": {"response_mime_type": "application/json"}
@@ -86,7 +95,7 @@ async def chat_endpoint(
     try:
         user_query = text if text else message
         if not user_query: 
-            return {"answer": "Boş mesaj.", "reply": "Boş mesaj.", "sources": []}
+            return {"answer": "Boş mesaj.", "reply": "Boş mesaj.", "sources": [], "debug_intent": None}
 
         logger.info(f"📨 [GİRİŞ] Mesaj: {user_query}")
 
@@ -100,7 +109,12 @@ async def chat_endpoint(
 
         # Eğer sohbet ise (Selam vs.) veya parça bulunamadıysa
         if intent == "CHAT" or not extracted_part:
-            return {"answer": "Aleykümselam ustam. Hangi parçayı arıyorsun? Marka veya parça adı söyle, hemen depoya bakayım.", "reply": "Buyur ustam?", "sources": []}
+            return {
+                "answer": "Aleykümselam ustam. Hangi parçayı arıyorsun? Marka veya parça adı söyle, hemen depoya bakayım.",
+                "reply": "Buyur ustam?",
+                "sources": [],
+                "debug_intent": analysis
+            }
 
         logger.info(f"🇹🇷 Arama Yapılıyor -> Marka: {extracted_brand} | Parça: {extracted_part}")
 
@@ -109,7 +123,12 @@ async def chat_endpoint(
         query_vector = get_text_embedding(extracted_part)
 
         if not query_vector:
-            return {"answer": "Teknik bir sorun oldu, beyin (embedding) yanıt vermedi.", "reply": "Hata", "sources": []}
+            return {
+                "answer": "Teknik bir sorun oldu, beyin (embedding) yanıt vermedi.",
+                "reply": "Hata",
+                "sources": [],
+                "debug_intent": analysis
+            }
 
         # 3. VERİTABANINDA ARA
         # search_vector_db fonksiyonu services/vector_db.py içinde
@@ -124,7 +143,7 @@ async def chat_endpoint(
         # 4. CEVABI HAZIRLA
         if not results:
             msg = f"Ustam, '{extracted_part}' parçası için veritabanında uygun sonuç bulamadım. Marka ({extracted_brand}) doğru mu? Belki parça ismi farklıdır?"
-            return {"answer": msg, "reply": msg, "sources": []}
+            return {"answer": msg, "reply": msg, "sources": [], "debug_intent": analysis}
 
         # Gemini'ye sunulacak metin ve Frontend için kaynak listesi
         context_lines = []
@@ -184,9 +203,15 @@ async def chat_endpoint(
         return {
             "answer": ai_reply,
             "reply": ai_reply,
-            "sources": sources_list
+            "sources": sources_list,
+            "debug_intent": analysis
         }
 
     except Exception as e:
         logger.error(f"Chat Hatası: {e}")
-        return {"answer": "Sistemsel bir hata oluştu ustam.", "reply": "Hata", "sources": []}
+        return {
+            "answer": "Sistemsel bir hata oluştu ustam.",
+            "reply": "Hata",
+            "sources": [],
+            "debug_intent": None
+        }
