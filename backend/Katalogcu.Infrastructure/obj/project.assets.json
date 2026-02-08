@@ -840,19 +840,19 @@
     ]
   },
   "packageFolders": {
-    "/Users/suleymankolenoglu/.nuget/packages/": {}
+    "/home/runner/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Infrastructure/Katalogcu.Infrastructure.csproj",
+      "projectUniqueName": "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Infrastructure/Katalogcu.Infrastructure.csproj",
       "projectName": "Katalogcu.Infrastructure",
-      "projectPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Infrastructure/Katalogcu.Infrastructure.csproj",
-      "packagesPath": "/Users/suleymankolenoglu/.nuget/packages/",
-      "outputPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Infrastructure/obj/",
+      "projectPath": "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Infrastructure/Katalogcu.Infrastructure.csproj",
+      "packagesPath": "/home/runner/.nuget/packages/",
+      "outputPath": "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Infrastructure/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/suleymankolenoglu/.nuget/NuGet/NuGet.Config"
+        "/home/runner/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
@@ -864,11 +864,11 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj": {
-              "projectPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Application/Katalogcu.Application.csproj"
+            "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Application/Katalogcu.Application.csproj": {
+              "projectPath": "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Application/Katalogcu.Application.csproj"
             },
-            "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {
-              "projectPath": "/Users/suleymankolenoglu/Desktop/Projeler/Katalogcu/backend/Katalogcu.Domain/Katalogcu.Domain.csproj"
+            "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Domain/Katalogcu.Domain.csproj": {
+              "projectPath": "/home/runner/work/Partalog/Partalog/backend/Katalogcu.Domain/Katalogcu.Domain.csproj"
             }
           }
         }
@@ -883,7 +883,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.100"
     },
     "frameworks": {
       "net9.0": {
@@ -910,7 +910,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.302/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.102/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

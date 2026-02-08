@@ -149,6 +149,11 @@ namespace Katalogcu.API.Controllers
                             .GroupBy(s => s.Query!)
                             .ToDictionary(g => g.Key, g => g.ToList());
 
+                        // Collect sources without query field (these apply to all terms as fallback)
+                        var sourcesWithoutQuery = aiResponse.Sources
+                            .Where(s => string.IsNullOrEmpty(s.Query))
+                            .ToList();
+
                         foreach (var term in multiTerms)
                         {
                             List<EnrichedPartResult> products;
@@ -157,6 +162,11 @@ namespace Katalogcu.API.Controllers
                             if (sourcesByQuery.TryGetValue(term, out var sourcesForQuery))
                             {
                                 products = await EnrichPythonSourcesAsync(sourcesForQuery, userId);
+                            }
+                            else if (sourcesWithoutQuery.Any())
+                            {
+                                // Use sources without query as fallback
+                                products = await EnrichPythonSourcesAsync(sourcesWithoutQuery, userId);
                             }
                             else
                             {
