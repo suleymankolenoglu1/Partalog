@@ -41,16 +41,18 @@
             </a>
 
             <div class="store-card-wrapper">
-                <a [routerLink]="['/public-view', userId]" target="_blank" class="store-card">
-                    <div class="store-icon-box">
-                        <span class="material-symbols-outlined store-icon">storefront</span>
-                    </div>
-                    <div class="store-info">
-                        <span class="store-title">Mağaza Vitrini</span>
-                        <span class="store-subtitle">Müşteri Görünümü</span>
-                    </div>
-                    <span class="material-symbols-outlined arrow-icon">open_in_new</span>
-                </a>
+                @if (userId) {
+                    <a [routerLink]="['/public-view', userId]" target="_blank" class="store-card">
+                        <div class="store-icon-box">
+                            <span class="material-symbols-outlined store-icon">storefront</span>
+                        </div>
+                        <div class="store-info">
+                            <span class="store-title">Mağaza Vitrini</span>
+                            <span class="store-subtitle">Müşteri Görünümü</span>
+                        </div>
+                        <span class="material-symbols-outlined arrow-icon">open_in_new</span>
+                    </a>
+                }
             </div>
         </nav>
 
