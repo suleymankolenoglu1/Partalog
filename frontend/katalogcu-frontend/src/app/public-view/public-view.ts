@@ -138,7 +138,7 @@ export class PublicViewComponent implements OnInit {
     this.aiState.isLoading = true;
     this.aiState.response = null;
 
-    this.chatHistory.push({ role: 'user', content: this.searchText || '(Resim Gönderildi)' });
+    this.chatHistory.push({ role: 'user', text: this.searchText || '(Resim Gönderildi)' });
 
     this.aiService.sendMessage(
       this.searchText, 
@@ -179,7 +179,7 @@ export class PublicViewComponent implements OnInit {
           debugInfo: res.debugInfo
         };
 
-        this.chatHistory.push({ role: 'assistant', content: res.replySuggestion });
+        this.chatHistory.push({ role: 'assistant', text: res.replySuggestion });
       },
       error: (err) => {
         this.aiState.isLoading = false;
