@@ -135,32 +135,66 @@ namespace Katalogcu.API.Controllers
                     });
                 }
 
-                // ✅ SEARCH intent + multi-part -> yan yana listele
+                // ✅ SEARCH intent + multi-part -> yan yana listele (SEMANTIC öncelikli)
                 if (string.Equals(intent, "SEARCH", StringComparison.OrdinalIgnoreCase) && multiTerms.Count > 1)
                 {
-                    var compareGroups = new List<CompareGroupDto>();
+                    // ✅ Önce Python semantik kaynakları (varsa)
+                    if (aiResponse.Sources != null && aiResponse.Sources.Any())
+                    {
+                        var compareGroups = new List<CompareGroupDto>();
+
+                        var grouped = aiResponse.Sources
+                            .Where(s => !string.IsNullOrWhiteSpace(s.Code))
+                            .GroupBy(s => s.Query ?? string.Empty);
+
+                        foreach (var group in grouped)
+                        {
+                            var products = await EnrichPythonSourcesAsync(group.ToList(), userId);
+
+                            compareGroups.Add(new CompareGroupDto
+                            {
+                                Query = string.IsNullOrWhiteSpace(group.Key) ? "Genel" : group.Key,
+                                Results = products
+                            });
+                        }
+
+                        var anyResults = compareGroups.Any(g => g.Results.Any());
+
+                        return Ok(new ChatResponseDto
+                        {
+                            ReplySuggestion = anyResults
+                                ? "Birden fazla parça için sonuçları ayrı ayrı listeledim."
+                                : "Birden fazla parça istedin ama uygun sonuç bulamadım.",
+                            Products = new List<EnrichedPartResult>(),
+                            CompareGroups = compareGroups,
+                            DebugInfo = $"Intent: SEARCH | Terms: {string.Join(", ", multiTerms)}"
+                        });
+                    }
+
+                    // ✅ Fallback: eski kod araması
+                    var compareGroupsFallback = new List<CompareGroupDto>();
 
                     foreach (var term in multiTerms)
                     {
                         var results = await SearchByCodeAsync(term, userId);
                         var products = await EnrichResultsAsync(results, userId);
 
-                        compareGroups.Add(new CompareGroupDto
+                        compareGroupsFallback.Add(new CompareGroupDto
                         {
                             Query = term,
                             Results = products
                         });
                     }
 
-                    var anyResults = compareGroups.Any(g => g.Results.Any());
+                    var anyFallback = compareGroupsFallback.Any(g => g.Results.Any());
 
                     return Ok(new ChatResponseDto
                     {
-                        ReplySuggestion = anyResults
+                        ReplySuggestion = anyFallback
                             ? "Birden fazla parça için sonuçları ayrı ayrı listeledim."
                             : "Birden fazla parça istedin ama uygun sonuç bulamadım.",
                         Products = new List<EnrichedPartResult>(),
-                        CompareGroups = compareGroups,
+                        CompareGroups = compareGroupsFallback,
                         DebugInfo = $"Intent: SEARCH | Terms: {string.Join(", ", multiTerms)}"
                     });
                 }
@@ -419,6 +453,10 @@ namespace Katalogcu.API.Controllers
                 productDict.TryGetValue(source.Code, out var product);
                 itemDict.TryGetValue(source.Code, out var catItem);
 
+                // ✅ Legacy fallback
+                var sourceModel = source.Model ?? source.LegacyModel;
+                var sourceDesc = source.Description ?? source.LegacyDescription;
+
                 string finalName = catItem?.PartName;
                 if (string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") finalName = source.Name;
                 if ((string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") && !string.IsNullOrWhiteSpace(catItem?.Description)) finalName = catItem.Description;
@@ -429,8 +467,8 @@ namespace Katalogcu.API.Controllers
                     Id = catItem?.Id ?? Guid.Empty,
                     Code = source.Code,
                     Name = finalName,
-                    Description = catItem?.Description ?? source.Description,
-                    Model = source.Model,
+                    Description = catItem?.Description ?? sourceDesc,
+                    Model = sourceModel,
                     CatalogId = catItem?.CatalogId ?? Guid.Empty,
                     PageNumber = catItem?.PageNumber,
                     StockStatus = product != null ? "Stokta Var" : "Stokta Yok",
