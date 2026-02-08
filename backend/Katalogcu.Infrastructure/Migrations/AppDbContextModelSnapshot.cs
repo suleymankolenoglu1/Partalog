@@ -164,6 +164,21 @@ namespace Katalogcu.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("VisualBbox")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Vector>("VisualEmbedding")
+                        .HasColumnType("vector(3072)");
+
+                    b.Property<string>("VisualOcrText")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("VisualPageNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("VisualShapeTags")
+                        .HasColumnType("jsonb");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CatalogId");

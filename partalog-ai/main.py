@@ -28,6 +28,7 @@ from api.hotspot import router as hotspot_router   # YOLO & OCR
 from api.table import router as table_router       # Gemini Tablo Okuma
 from api.analysis import router as analysis_router # Sayfa Sınıflandırma
 from api.chat import router as chat_router         # Chatbot (Türkçe & 3072 Uyumlu)
+from api.visual_ingest import router as visual_ingest_router  # ✅ Visual Ingest
 
 # --- 5. Gelişmiş Loglama Ayarı ---
 logger.remove()
@@ -102,6 +103,7 @@ app.include_router(analysis_router, prefix="/api/analysis", tags=["1. Analiz"])
 app.include_router(hotspot_router, prefix="/api/hotspot", tags=["2. Hotspot (YOLO)"])
 app.include_router(table_router, prefix="/api/table", tags=["3. Tablo (Gemini Türkçe)"])
 app.include_router(chat_router, prefix="/api/chat", tags=["4. Chatbot"])
+app.include_router(visual_ingest_router, prefix="/api", tags=["5. Visual Ingest"])
 
 # =================================================================
 # 👇 C# İÇİN YARDIMCI ENDPOINTLER
@@ -110,7 +112,7 @@ app.include_router(chat_router, prefix="/api/chat", tags=["4. Chatbot"])
 class EmbeddingRequest(BaseModel):
     text: str
 
-@app.post("/api/embed", tags=["5. Semantic Search (C# Helper)"])
+@app.post("/api/embed", tags=["6. Semantic Search (C# Helper)"])
 async def generate_embedding_endpoint(req: EmbeddingRequest):
     """
     C# Backend bu endpoint'e metin gönderir.

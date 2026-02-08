@@ -2,15 +2,13 @@ using Katalogcu.Domain.Common;
 using System.ComponentModel.DataAnnotations.Schema;
 using Pgvector;
 using System.Numerics;
+
 namespace Katalogcu.Domain.Entities
 {
     // 📚 KÜTÜPHANE TABLOSU
     public class CatalogItem : BaseEntity
     {
         // --- İLİŞKİLER (Navigation Properties) ---
-
-
-        
         // Foreign Key
         public Guid CatalogId { get; set; }
 
@@ -37,11 +35,28 @@ namespace Katalogcu.Domain.Entities
         public string Description { get; set; } = string.Empty;
 
         // Vektör Temsili (Embedding)
-       
-        [Column(TypeName = "vector(3072)")] 
+        [Column(TypeName = "vector(3072)")]
         public Pgvector.Vector? Embedding { get; set; }
 
-        public string? MachineModel { get; set; } 
+        // --- VISUAL SEARCH ALANLARI ---
+        [Column(TypeName = "vector(3072)")]
+        public Pgvector.Vector? VisualEmbedding { get; set; }
+
+        // Gemini bbox sonucu (jsonb)
+        [Column(TypeName = "jsonb")]
+        public string? VisualBbox { get; set; }
+
+        // Gemini shape/tags sonucu (jsonb)
+        [Column(TypeName = "jsonb")]
+        public string? VisualShapeTags { get; set; }
+
+        // OCR çıktısı (text)
+        public string? VisualOcrText { get; set; }
+
+        // Hangi sayfadan geldi
+        public int? VisualPageNumber { get; set; }
+
+        public string? MachineModel { get; set; }
         public string? MachineBrand { get; set; }
 
         public string? MachineGroup { get; set; }
@@ -50,8 +65,6 @@ namespace Katalogcu.Domain.Entities
 
         public string? Mechanism { get; set; }
 
-
-        
         [NotMapped]
         public bool IsInStock { get; set; }
     }
