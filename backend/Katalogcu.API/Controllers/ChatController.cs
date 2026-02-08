@@ -140,16 +140,59 @@ namespace Katalogcu.API.Controllers
                 {
                     var compareGroups = new List<CompareGroupDto>();
 
-                    foreach (var term in multiTerms)
+                    // ✅ Prefer Python semantic sources when available
+                    if (aiResponse.Sources != null && aiResponse.Sources.Any())
                     {
-                        var results = await SearchByCodeAsync(term, userId);
-                        var products = await EnrichResultsAsync(results, userId);
+                        // Group Python sources by query field
+                        var groupedSources = aiResponse.Sources
+                            .Where(s => !string.IsNullOrWhiteSpace(s.Query))
+                            .GroupBy(s => s.Query)
+                            .ToList();
 
-                        compareGroups.Add(new CompareGroupDto
+                        if (groupedSources.Any())
                         {
-                            Query = term,
-                            Results = products
-                        });
+                            // Process grouped Python sources
+                            foreach (var group in groupedSources)
+                            {
+                                var products = await EnrichPythonSourcesAsync(group.ToList(), userId);
+                                
+                                compareGroups.Add(new CompareGroupDto
+                                {
+                                    Query = group.Key!,
+                                    Results = products
+                                });
+                            }
+                        }
+                        else
+                        {
+                            // Python sources exist but no query field, fallback to term-based search
+                            foreach (var term in multiTerms)
+                            {
+                                var results = await SearchByCodeAsync(term, userId);
+                                var products = await EnrichResultsAsync(results, userId);
+
+                                compareGroups.Add(new CompareGroupDto
+                                {
+                                    Query = term,
+                                    Results = products
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // No Python sources, fallback to existing SearchByCodeAsync logic
+                        foreach (var term in multiTerms)
+                        {
+                            var results = await SearchByCodeAsync(term, userId);
+                            var products = await EnrichResultsAsync(results, userId);
+
+                            compareGroups.Add(new CompareGroupDto
+                            {
+                                Query = term,
+                                Results = products
+                            });
+                        }
                     }
 
                     var anyResults = compareGroups.Any(g => g.Results.Any());
@@ -424,13 +467,17 @@ namespace Katalogcu.API.Controllers
                 if ((string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") && !string.IsNullOrWhiteSpace(catItem?.Description)) finalName = catItem.Description;
                 if (string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") finalName = $"Parça {source.Code}";
 
+                // ✅ Use new Python fields with fallback to legacy fields
+                string? sourceDescription = source.Description ?? source.LegacyDescription;
+                string? sourceModel = source.MachineModel ?? source.LegacyModel;
+
                 enrichedList.Add(new EnrichedPartResult
                 {
                     Id = catItem?.Id ?? Guid.Empty,
                     Code = source.Code,
                     Name = finalName,
-                    Description = catItem?.Description ?? source.Description,
-                    Model = source.Model,
+                    Description = catItem?.Description ?? sourceDescription,
+                    Model = sourceModel,
                     CatalogId = catItem?.CatalogId ?? Guid.Empty,
                     PageNumber = catItem?.PageNumber,
                     StockStatus = product != null ? "Stokta Var" : "Stokta Yok",

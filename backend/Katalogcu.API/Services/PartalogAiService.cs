@@ -312,11 +312,25 @@ public class ChatSourceDto
     [JsonPropertyName("name")]
     public string? Name { get; set; }
 
-    [JsonPropertyName("model")]
-    public string? Model { get; set; }
+    // ✅ New Python field: machine_model
+    [JsonPropertyName("machine_model")]
+    public string? MachineModel { get; set; }
 
-    [JsonPropertyName("desc")]
+    // ✅ Legacy field: model (for backwards compatibility)
+    [JsonPropertyName("model")]
+    public string? LegacyModel { get; set; }
+
+    // ✅ New Python field: description
+    [JsonPropertyName("description")]
     public string? Description { get; set; }
+
+    // ✅ Legacy field: desc (for backwards compatibility)
+    [JsonPropertyName("desc")]
+    public string? LegacyDescription { get; set; }
+
+    // ✅ Query field for grouping multi-term results
+    [JsonPropertyName("query")]
+    public string? Query { get; set; }
 
     [JsonPropertyName("similarity")]
     public double Similarity { get; set; }

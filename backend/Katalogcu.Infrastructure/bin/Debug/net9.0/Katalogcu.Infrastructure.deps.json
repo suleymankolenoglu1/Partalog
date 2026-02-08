@@ -19,7 +19,6 @@
       "Microsoft.EntityFrameworkCore/9.0.0": {
         "dependencies": {
           "Microsoft.EntityFrameworkCore.Abstractions": "9.0.0",
-          "Microsoft.EntityFrameworkCore.Analyzers": "9.0.0",
           "Microsoft.Extensions.Caching.Memory": "9.0.0",
           "Microsoft.Extensions.Logging": "9.0.0"
         },
@@ -38,7 +37,6 @@
           }
         }
       },
-      "Microsoft.EntityFrameworkCore.Analyzers/9.0.0": {},
       "Microsoft.EntityFrameworkCore.Relational/9.0.0": {
         "dependencies": {
           "Microsoft.EntityFrameworkCore": "9.0.0",
@@ -155,8 +153,7 @@
       },
       "Npgsql/9.0.0": {
         "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
-          "System.Text.Json": "9.0.0"
+          "Microsoft.Extensions.Logging.Abstractions": "9.0.0"
         },
         "runtime": {
           "lib/net8.0/Npgsql.dll": {
@@ -189,7 +186,6 @@
           }
         }
       },
-      "System.Text.Json/9.0.0": {},
       "Katalogcu.Application/1.0.0": {
         "dependencies": {
           "Katalogcu.Domain": "1.0.0"
@@ -233,13 +229,6 @@
       "sha512": "sha512-fnmifFL8KaA4ZNLCVgfjCWhZUFxkrDInx5hR4qG7Q8IEaSiy/6VOSRFyx55oH7MV4y7wM3J3EE90nSpcVBI44Q==",
       "path": "microsoft.entityframeworkcore.abstractions/9.0.0",
       "hashPath": "microsoft.entityframeworkcore.abstractions.9.0.0.nupkg.sha512"
-    },
-    "Microsoft.EntityFrameworkCore.Analyzers/9.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-Qje+DzXJOKiXF72SL0XxNlDtTkvWWvmwknuZtFahY5hIQpRKO59qnGuERIQ3qlzuq5x4bAJ8WMbgU5DLhBgeOQ==",
-      "path": "microsoft.entityframeworkcore.analyzers/9.0.0",
-      "hashPath": "microsoft.entityframeworkcore.analyzers.9.0.0.nupkg.sha512"
     },
     "Microsoft.EntityFrameworkCore.Relational/9.0.0": {
       "type": "package",
@@ -331,13 +320,6 @@
       "sha512": "sha512-n7M5LuNejHUmtWky3zCbNO+tP1Gnjiuv9Qtu4LyvB1602dD8RiBxxCQp9jEjM0ZFDxAZF1oOWkNIkXw46KT00Q==",
       "path": "pgvector/0.3.2",
       "hashPath": "pgvector.0.3.2.nupkg.sha512"
-    },
-    "System.Text.Json/9.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-js7+qAu/9mQvnhA4EfGMZNEzXtJCDxgkgj8ohuxq/Qxv+R56G+ljefhiJHOxTNiw54q8vmABCWUwkMulNdlZ4A==",
-      "path": "system.text.json/9.0.0",
-      "hashPath": "system.text.json.9.0.0.nupkg.sha512"
     },
     "Katalogcu.Application/1.0.0": {
       "type": "project",
