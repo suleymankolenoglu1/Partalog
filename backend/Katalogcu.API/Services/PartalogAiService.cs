@@ -320,6 +320,16 @@ public class ChatSourceDto
 
     [JsonPropertyName("similarity")]
     public double Similarity { get; set; }
+
+    // ✅ Legacy/alternate field names from Python service
+    [JsonPropertyName("machine_model")]
+    public string? MachineModel { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? DescriptionFull { get; set; }
+
+    [JsonPropertyName("query")]
+    public string? Query { get; set; }
 }
 
 public class PageAnalysisResult

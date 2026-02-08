@@ -140,16 +140,52 @@ namespace Katalogcu.API.Controllers
                 {
                     var compareGroups = new List<CompareGroupDto>();
 
-                    foreach (var term in multiTerms)
+                    // ✅ Try to use semantic results from Python service if available
+                    if (aiResponse.Sources != null && aiResponse.Sources.Any())
                     {
-                        var results = await SearchByCodeAsync(term, userId);
-                        var products = await EnrichResultsAsync(results, userId);
+                        // Group sources by query when available
+                        var sourcesByQuery = aiResponse.Sources
+                            .Where(s => !string.IsNullOrEmpty(s.Query))
+                            .GroupBy(s => s.Query!)
+                            .ToDictionary(g => g.Key, g => g.ToList());
 
-                        compareGroups.Add(new CompareGroupDto
+                        foreach (var term in multiTerms)
                         {
-                            Query = term,
-                            Results = products
-                        });
+                            List<EnrichedPartResult> products;
+
+                            // Check if we have Python sources for this query
+                            if (sourcesByQuery.TryGetValue(term, out var sourcesForQuery))
+                            {
+                                products = await EnrichPythonSourcesAsync(sourcesForQuery, userId);
+                            }
+                            else
+                            {
+                                // Fallback to code search
+                                var results = await SearchByCodeAsync(term, userId);
+                                products = await EnrichResultsAsync(results, userId);
+                            }
+
+                            compareGroups.Add(new CompareGroupDto
+                            {
+                                Query = term,
+                                Results = products
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // Fallback to existing code-only search
+                        foreach (var term in multiTerms)
+                        {
+                            var results = await SearchByCodeAsync(term, userId);
+                            var products = await EnrichResultsAsync(results, userId);
+
+                            compareGroups.Add(new CompareGroupDto
+                            {
+                                Query = term,
+                                Results = products
+                            });
+                        }
                     }
 
                     var anyResults = compareGroups.Any(g => g.Results.Any());
@@ -424,13 +460,17 @@ namespace Katalogcu.API.Controllers
                 if ((string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") && !string.IsNullOrWhiteSpace(catItem?.Description)) finalName = catItem.Description;
                 if (string.IsNullOrWhiteSpace(finalName) || finalName == "Unknown Part") finalName = $"Parça {source.Code}";
 
+                // ✅ Use legacy fields as fallback: machine_model -> model, description -> desc
+                string? sourceModel = source.Model ?? source.MachineModel;
+                string? sourceDescription = source.Description ?? source.DescriptionFull;
+
                 enrichedList.Add(new EnrichedPartResult
                 {
                     Id = catItem?.Id ?? Guid.Empty,
                     Code = source.Code,
                     Name = finalName,
-                    Description = catItem?.Description ?? source.Description,
-                    Model = source.Model,
+                    Description = catItem?.Description ?? sourceDescription,
+                    Model = sourceModel,
                     CatalogId = catItem?.CatalogId ?? Guid.Empty,
                     PageNumber = catItem?.PageNumber,
                     StockStatus = product != null ? "Stokta Var" : "Stokta Yok",
