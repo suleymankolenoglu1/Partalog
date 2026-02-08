@@ -56,6 +56,9 @@ namespace Katalogcu.Domain.Entities
         // Hangi sayfadan geldi
         public int? VisualPageNumber { get; set; }
 
+        // Crop edilen görselin URL'i (S3/GCS)
+        public string? VisualImageUrl { get; set; }
+
         public string? MachineModel { get; set; }
         public string? MachineBrand { get; set; }
 

@@ -57,7 +57,7 @@ public class CatalogProcessorService
         }
 
         var client = _httpClientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromMinutes(5); 
+        client.Timeout = TimeSpan.FromMinutes(5);
 
         foreach (var page in pages)
         {
@@ -91,12 +91,12 @@ public class CatalogProcessorService
                 // ADIM 1: SAYFA ANALİZİ
                 var analysis = await _aiService.AnalyzePageAsync(fileBytes);
                 page.AiDescription = analysis.Title;
-                
+
                 // ADIM 2: TABLO VE VEKTÖR
                 if (analysis.IsPartsList)
                 {
                     var extractedItems = await _aiService.ExtractTableAsync(fileBytes, page.PageNumber);
-                    
+
                     if (extractedItems != null && extractedItems.Any())
                     {
                         var oldItems = await _context.CatalogItems
@@ -111,8 +111,8 @@ public class CatalogProcessorService
                                 CatalogId = catalogId,
                                 PageNumber = page.PageNumber.ToString(),
                                 RefNumber = item.RefNumber,
-                                PartCode = item.PartCode ?? "",   
-                                PartName = item.PartName ?? "",   
+                                PartCode = item.PartCode ?? "",
+                                PartName = item.PartName ?? "",
                                 Description = item.Description ?? "",
 
                                 // ✅ Yeni alanlar (CatalogItem tablosunda var)
@@ -135,7 +135,7 @@ public class CatalogProcessorService
 
                             _context.CatalogItems.Add(catalogItem);
                         }
-                        
+
                         await _context.SaveChangesAsync();
                         _logger.LogInformation($"📚 {extractedItems.Count} parça kaydedildi.");
                     }
@@ -168,6 +168,17 @@ public class CatalogProcessorService
 
         _logger.LogInformation($"🏁 Katalog İşlemi Tamamlandı: {catalog.Name}");
 
+        // ✅ Visual Ingest (PDF üzerinden otomatik tetikle)
+        try
+        {
+            await TriggerVisualIngestAsync(client, catalogId, catalog.PdfUrl);
+            _logger.LogInformation("✅ visual-ingest tetiklendi.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"⚠️ visual-ingest tetiklenemedi: {ex.Message}");
+        }
+
         try
         {
             _logger.LogInformation("🚂 Python'a eğitim emri gönderiliyor...");
@@ -177,6 +188,27 @@ public class CatalogProcessorService
         catch (Exception ex)
         {
             _logger.LogWarning($"⚠️ Eğitim tetiklenemedi (Sorun değil, sonraki katalogda öğrenir): {ex.Message}");
+        }
+    }
+
+    private async Task TriggerVisualIngestAsync(HttpClient client, Guid catalogId, string pdfUrl)
+    {
+        var pdfPath = GetFullPath(pdfUrl);
+        if (pdfPath == null)
+        {
+            _logger.LogWarning("⚠️ PDF dosyası bulunamadı, visual-ingest atlandı.");
+            return;
+        }
+
+        using var fs = File.OpenRead(pdfPath);
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(catalogId.ToString()), "catalog_id");
+        content.Add(new StreamContent(fs), "file", Path.GetFileName(pdfPath));
+
+        var response = await client.PostAsync($"{PYTHON_API_URL}/api/visual-ingest", content);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning($"⚠️ visual-ingest hata: {await response.Content.ReadAsStringAsync()}");
         }
     }
 

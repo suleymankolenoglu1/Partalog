@@ -43,7 +43,21 @@ class Settings(BaseSettings):
     PADDLE_LANG: str = Field(default="en")
     PADDLE_TABLE_MAX_LEN: int = Field(default=800)
     PADDLE_SHOW_LOG: bool = Field(default=False)
-    
+
+    # ==========================================
+    # 🗂️ STORAGE AYARLARI (LOCAL / S3 COMPAT)
+    # ==========================================
+    STORAGE_PROVIDER: str = Field(default="local")  # local | s3
+    STORAGE_BUCKET: str = Field(default="partalog-visuals")
+    STORAGE_BASE_URL: str = Field(default="https://storage.googleapis.com/partalog-visuals")
+    STORAGE_LOCAL_DIR: str = Field(default="static/visual-parts")
+
+    # S3 / GCS Interoperability
+    STORAGE_S3_ENDPOINT: str = Field(default="https://storage.googleapis.com")
+    STORAGE_ACCESS_KEY: str = Field(default="")
+    STORAGE_SECRET_KEY: str = Field(default="")
+    STORAGE_REGION: str = Field(default="auto")
+
     # Config Ayarları
     model_config = SettingsConfigDict(
         env_file=".env",
