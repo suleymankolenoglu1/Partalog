@@ -170,6 +170,9 @@ namespace Katalogcu.Infrastructure.Migrations
                     b.Property<Vector>("VisualEmbedding")
                         .HasColumnType("vector(3072)");
 
+                    b.Property<string>("VisualImageUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("VisualOcrText")
                         .HasColumnType("text");
 

@@ -33,5 +33,8 @@ pydantic>=2.7.0
 pydantic-settings>=2.2.0
 python-dotenv>=1.0.0
 
+boto3>=1.34.0
+
+
 # Logging
 loguru>=0.7.0

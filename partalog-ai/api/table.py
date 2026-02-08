@@ -9,6 +9,7 @@ import base64
 import json
 import io
 import asyncio
+import fitz  # ✅ PDF render
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Query
 from pydantic import BaseModel, Field
@@ -20,13 +21,13 @@ from config import settings
 router = APIRouter()
 
 # ✅ MODEL: gemini-2.0-flash (Hız ve Maliyet Dostu)
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-:generateContent?key={settings.GEMINI_API_KEY}"
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
 
 # --- Modeller ---
 class ProductResult(BaseModel):
     ref_number: str = Field(default="0")
     part_code: str
-    part_name: str = Field(default="PARÇA")  # ✅ BİLİNMEYEN PARÇA YOK
+    part_name: str = Field(default="PARÇA")
     description: str = Field(default="")
     quantity: int = Field(default=1)
     dimensions: Optional[str] = None
@@ -51,11 +52,9 @@ class MetadataResponse(BaseModel):
 
 # --- Endpoints ---
 
-# A. KAPAK ANALİZİ (Aynı Kalıyor)
 @router.post("/extract-metadata", response_model=MetadataResponse)
 async def extract_metadata(file: UploadFile = File(...)):
     logger.info("🔍 [METADATA] Kapak analizi (Zeka Modu) isteği geldi...")
-    
     try:
         content = await file.read()
         image = Image.open(io.BytesIO(content)).convert("RGB")
@@ -64,7 +63,6 @@ async def extract_metadata(file: UploadFile = File(...)):
         image.save(buffered, format="JPEG", quality=90)
         base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-        # Prompt: Marka ve Modeli Bul
         prompt = """
         You are an expert industrial sewing machine technician.
         Analyze this catalog cover image.
@@ -93,9 +91,7 @@ async def extract_metadata(file: UploadFile = File(...)):
                         clean_txt = txt.replace("```json", "").replace("```", "").strip()
                         data = json.loads(clean_txt)
 
-                        machine_group = data.get("machine_group")
-                        if not machine_group:
-                            machine_group = "General"
+                        machine_group = data.get("machine_group") or "General"
 
                         return MetadataResponse(
                             machine_model=data.get("machine_model", "Unknown"),
@@ -103,14 +99,13 @@ async def extract_metadata(file: UploadFile = File(...)):
                             machine_group=machine_group,
                             catalog_title=data.get("catalog_title", "Unknown Catalog")
                         )
-        
+
         return MetadataResponse(machine_model="Unknown", catalog_title="Error")
     except Exception as e:
         logger.error(f"Metadata Error: {e}")
         return MetadataResponse(machine_model="Error", catalog_title="Error")
 
 
-# B. TABLO AYIKLAMA VE TÜRÇELEŞTİRME (🔥 GÜNCELLENDİ)
 @router.post("/extract", response_model=TableExtractionResponse)
 async def extract_table(
     file: UploadFile = File(...),
@@ -121,16 +116,31 @@ async def extract_table(
     
     try:
         content = await file.read()
-        image = Image.open(io.BytesIO(content)).convert("RGB")
-        image.thumbnail((1500, 1500)) 
+        image = None
+
+        # ✅ PDF mi?
+        if content[:4] == b"%PDF":
+            doc = fitz.open(stream=content, filetype="pdf")
+            if page_number < 1 or page_number > doc.page_count:
+                logger.error("❌ Sayfa numarası geçersiz")
+                return _empty_response("Geçersiz sayfa")
+
+            page = doc.load_page(page_number - 1)
+            pix = page.get_pixmap(dpi=200)
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        else:
+            # ✅ Görsel (jpg/png) ise direkt aç
+            image = Image.open(io.BytesIO(content)).convert("RGB")
+
+        image.thumbnail((1500, 1500))
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG", quality=95)
         base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
     except Exception as e:
         logger.error(f"❌ Resim hatası: {e}")
         return _empty_response()
 
-    # 🇹🇷 EVRENSEL ÇEVİRİ PROMPTU 🇹🇷
     prompt_text = """
     You are Sewing Machine expert,Analyze this Sewing Machine Parts Catalog page. Extract the table into JSON.
 
@@ -175,6 +185,7 @@ async def extract_table(
 
     RETURN JSON LIST ONLY. NO MARKDOWN.
     """
+
     payload = {
         "contents": [{
             "parts": [
@@ -188,7 +199,7 @@ async def extract_table(
     products = []
     
     async with aiohttp.ClientSession() as session:
-        for attempt in range(3): # 3 kere dene
+        for attempt in range(3):
             try:
                 async with session.post(GEMINI_API_URL, json=payload) as response:
                     if response.status == 200:
@@ -210,7 +221,7 @@ async def extract_table(
 
                                 raw_name = str(item.get("part_name") or "").strip()
                                 if not raw_name:
-                                    raw_name = p_code  # ✅ boşsa part_code yaz
+                                    raw_name = p_code
 
                                 products.append(ProductResult(
                                     ref_number=str(item.get("ref_no") or "0"),

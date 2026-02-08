@@ -1,17 +1,19 @@
 import io
 import json
 import base64
+import uuid
 import fitz  # PyMuPDF
 import aiohttp
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, UploadFile, File, Form
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from PIL import Image
 from loguru import logger
 
 from config import settings
 from services.embedding import get_text_embedding
 from services.vector_db import get_db_connection
+from services.storage.storage_factory import save_file
 
 router = APIRouter()
 
@@ -139,6 +141,13 @@ async def visual_ingest(
                     skipped_no_match += 1
                     continue
 
+                # Crop görselini kaydet
+                buffered = io.BytesIO()
+                crop_image.save(buffered, format="JPEG", quality=90)
+
+                object_key = f"{catalog_id}/{page_number}/{label}-{uuid.uuid4().hex}.jpg"
+                visual_image_url = save_file(buffered.getvalue(), object_key)
+
                 # CatalogItems üzerinde güncelle
                 update_sql = """
                     UPDATE "CatalogItems"
@@ -148,11 +157,12 @@ async def visual_ingest(
                         "VisualShapeTags" = $3,
                         "VisualOcrText" = $4,
                         "VisualPageNumber" = $5,
+                        "VisualImageUrl" = $6,
                         "UpdatedDate" = NOW()
                     WHERE
-                        "CatalogId" = $6
-                        AND "PageNumber" = $7
-                        AND "RefNumber" = $8
+                        "CatalogId" = $7
+                        AND "PageNumber" = $8
+                        AND "RefNumber" = $9
                     RETURNING "Id";
                 """
 
@@ -163,6 +173,7 @@ async def visual_ingest(
                     json.dumps(shape_tags),
                     ocr_text,
                     page_number,
+                    visual_image_url,
                     catalog_id,
                     str(page_number),
                     label

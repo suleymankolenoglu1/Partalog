@@ -435,7 +435,9 @@ namespace Katalogcu.API.Controllers
                     PageNumber = catItem?.PageNumber,
                     StockStatus = product != null ? "Stokta Var" : "Stokta Yok",
                     Price = product?.Price,
-                    ImageUrl = product?.ImageUrl
+                    ImageUrl = !string.IsNullOrWhiteSpace(catItem?.VisualImageUrl)
+                        ? catItem.VisualImageUrl
+                        : product?.ImageUrl
                 });
             }
             return enrichedList;
@@ -506,7 +508,9 @@ namespace Katalogcu.API.Controllers
                     PageNumber = targetItem.PageNumber,
                     StockStatus = product != null ? "Stokta Var" : "Stokta Yok",
                     Price = product?.Price,
-                    ImageUrl = product?.ImageUrl
+                    ImageUrl = !string.IsNullOrWhiteSpace(targetItem.VisualImageUrl)
+                        ? targetItem.VisualImageUrl
+                        : product?.ImageUrl
                 };
             }).ToList();
         }
