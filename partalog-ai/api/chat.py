@@ -104,7 +104,8 @@ def split_terms(text: str):
 async def chat_endpoint(
     text: str = Form(None),   
     message: str = Form(None),
-    history: str = Form("[]")
+    history: str = Form("[]"),
+    catalog_ids: str = Form("[]")
 ):
     try:
         user_query = text if text else message
@@ -112,6 +113,12 @@ async def chat_endpoint(
             return {"answer": "Boş mesaj.", "reply": "Boş mesaj.", "sources": [], "debug_intent": None}
 
         logger.info(f"📨 [GİRİŞ] Mesaj: {user_query}")
+
+        # ✅ catalog_ids parse
+        try:
+            catalog_ids_list = json.loads(catalog_ids) or []
+        except Exception:
+            catalog_ids_list = []
 
         # 1. ANALİZ ET (Router)
         analysis = await analyze_intent_with_gemini(user_query)
@@ -161,7 +168,8 @@ async def chat_endpoint(
                 results = await search_vector_db(
                     query_vector, 
                     brand_filter=extracted_brand, 
-                    limit=5
+                    limit=5,
+                    catalog_ids=catalog_ids_list
                 )
 
                 for p in results:
@@ -208,7 +216,8 @@ async def chat_endpoint(
         results = await search_vector_db(
             query_vector, 
             brand_filter=extracted_brand, 
-            limit=5
+            limit=5,
+            catalog_ids=catalog_ids_list
         )
         
         logger.success(f"📦 Sonuç Sayısı: {len(results)}")

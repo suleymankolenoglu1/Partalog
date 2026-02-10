@@ -76,12 +76,20 @@ namespace Katalogcu.API.Controllers
                     catch { _logger.LogWarning("History parse edilemedi, sohbet sıfırdan başlıyor."); }
                 }
 
+                // ✅ Kullanıcıya ait katalogları çıkar
+                var catalogIds = await _context.Catalogs
+                    .AsNoTracking()
+                    .Where(c => c.UserId == userId)
+                    .Select(c => c.Id.ToString())
+                    .ToListAsync();
+
                 // 2. Servis İsteği Hazırlığı
                 var aiRequest = new AiChatRequestDto
                 {
                     Text = request.Text,
                     Image = request.Image,
-                    History = chatHistory
+                    History = chatHistory,
+                    CatalogIds = catalogIds
                 };
 
                 // 3. AI Analizi (Python)

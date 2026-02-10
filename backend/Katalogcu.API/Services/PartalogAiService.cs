@@ -148,6 +148,12 @@ public class PartalogAiService : IPartalogAiService
             var historyJson = JsonSerializer.Serialize(request.History ?? new List<ChatMessageDto>(), _jsonOptions);
             content.Add(new StringContent(historyJson), "history");
 
+            if (request.CatalogIds != null && request.CatalogIds.Any())
+            {
+                var idsJson = JsonSerializer.Serialize(request.CatalogIds, _jsonOptions);
+                content.Add(new StringContent(idsJson), "catalog_ids");
+            }
+
             if (request.Image != null)
             {
                 var fileStream = request.Image.OpenReadStream();
@@ -277,12 +283,14 @@ public class PartalogAiService : IPartalogAiService
 }
 
 // --- PUBLIC DTO'LAR (GÜNCELLENMİŞ YAPI) ---
-
 public class AiChatRequestDto
 {
     public string? Text { get; set; }
     public List<ChatMessageDto> History { get; set; } = new(); 
-    public IFormFile? Image { get; set; } 
+    public IFormFile? Image { get; set; }
+
+    // ✅ EKLENECEK
+    public List<string>? CatalogIds { get; set; }
 }
 
 public class ChatMessageDto

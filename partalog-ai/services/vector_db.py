@@ -33,7 +33,7 @@ async def get_db_connection():
         logger.error(f"❌ Veritabanı Bağlantı Hatası: {e}")
         return None
 
-async def search_vector_db(query_vector: list, brand_filter: str = None, limit: int = 5):
+async def search_vector_db(query_vector: list, brand_filter: str = None, limit: int = 5, catalog_ids: list = None):
     """
     Vektörel benzerlik araması yapar.
     
@@ -41,6 +41,7 @@ async def search_vector_db(query_vector: list, brand_filter: str = None, limit: 
         query_vector (list): 3072 boyutlu float listesi.
         brand_filter (str): Marka filtresi (Opsiyonel).
         limit (int): Sonuç sayısı.
+        catalog_ids (list): Kullanıcıya ait katalog ID listesi (Opsiyonel).
     """
     conn = await get_db_connection()
     if not conn:
@@ -71,6 +72,12 @@ async def search_vector_db(query_vector: list, brand_filter: str = None, limit: 
         # pgvector için vektörü string formatında gönderiyoruz '[0.1, 0.2...]'
         params = [str(query_vector)]
         param_idx = 2
+
+        # ✅ Catalog filtresi (kullanıcıya ait kataloglar)
+        if catalog_ids:
+            sql += f" AND \"CatalogId\" = ANY(${param_idx})"
+            params.append(catalog_ids)
+            param_idx += 1
 
         # 3. Marka Filtresi (Varsa)
         if brand_filter:
