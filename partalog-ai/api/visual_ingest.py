@@ -2,11 +2,13 @@ import base64
 import io
 import json
 import uuid
-from typing import List
+import asyncio
+from typing import List, Optional
 
 import aiohttp
 import fitz
-from fastapi import APIRouter, UploadFile, File, Form
+import numpy as np
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from loguru import logger
 from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel
@@ -18,18 +20,31 @@ from services.vector_db import get_db_connection
 
 router = APIRouter()
 
+# ✅ Daha zeki model opsiyonu
 GEMINI_VISUAL_MODEL = getattr(settings, "GEMINI_VISUAL_MODEL", "gemini-3-pro-preview")
 GEMINI_API_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_VISUAL_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
 )
 
+# 🔥 Görsel kalite ayarları
 RENDER_DPI = 450
 CROP_PADDING_RATIO = 0.04
 CROP_MIN_SIZE = 300
 SHARPEN_ENABLED = True
-OUTPUT_FORMAT = "PNG"  # ✅ çıktı formatı
+
+# ✅ Minimum bbox alanı (normalize)
+MIN_BBOX_AREA = 0.0005  # örn: %0.05
+
+# ✅ Çıktı formatı
+OUTPUT_FORMAT = "PNG"
 OUTPUT_EXTENSION = "png"
+
+# ✅ YOLO tespit için bytes formatı
+DETECT_FORMAT = "PNG"
+
+# ✅ Gemini timeout
+GEMINI_TIMEOUT_SECONDS = 30
 
 class VisualIngestResponse(BaseModel):
     total_pages: int
@@ -37,6 +52,14 @@ class VisualIngestResponse(BaseModel):
     total_parts_updated: int
     skipped_no_match: int
     skipped_non_technical: int
+
+# ✅ Sayfa bazlı Gemini cache
+_PAGE_CACHE = {}
+
+def get_models():
+    """Ana uygulamadan model referanslarını al."""
+    from main import models
+    return models
 
 def render_page_to_image(doc: fitz.Document, page_index: int) -> Image.Image:
     page = doc.load_page(page_index)
@@ -49,55 +72,48 @@ def enhance_image(image: Image.Image) -> Image.Image:
         image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=180, threshold=3))
     return image
 
-async def detect_parts_with_gemini(image: Image.Image) -> List[dict]:
-    buffered = io.BytesIO()
-    image.save(buffered, format="JPEG", quality=90, subsampling=0)
-    base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+def image_to_bytes(image: Image.Image, fmt: str = "PNG", quality: int = 90) -> bytes:
+    buffer = io.BytesIO()
+    if fmt.upper() == "JPEG":
+        image.save(buffer, format="JPEG", quality=quality, subsampling=0)
+    else:
+        image.save(buffer, format=fmt, optimize=True)
+    return buffer.getvalue()
 
-    prompt = """
-    You are a technical drawing analyzer for industrial spare parts catalogs.
+def normalize_ref(value: str) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip().upper().replace(" ", "")
+    if cleaned.isdigit():
+        cleaned = str(int(cleaned))
+    return cleaned
 
-    TASK:
-    - Detect each individual part in the drawing.
-    - For each part, return:
-      1) label (the Ref number near the part if present)
-      2) bbox (normalized 0-1 coordinates: x1,y1,x2,y2)
-      3) ocr_text (technical text near the part if any)
-      4) shape_tags (short tags like: "flange", "6-hole", "round", "plate")
-
-    OUTPUT JSON FORMAT:
-    {
-      "parts": [
-        {
-          "label": "12",
-          "bbox": { "x1": 0.12, "y1": 0.08, "x2": 0.32, "y2": 0.28 },
-          "ocr_text": "M10x50",
-          "shape_tags": ["flange", "6-hole", "round"]
-        }
-      ]
-    }
-    """
-
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt},
-                {"inline_data": {"mime_type": "image/jpeg", "data": base64_image}}
-            ]
-        }],
-        "generationConfig": { "response_mime_type": "application/json", "temperature": 0.2 }
+def clamp_bbox(bbox: dict) -> dict:
+    return {
+        "x1": max(0.0, min(1.0, float(bbox.get("x1", 0)))),
+        "y1": max(0.0, min(1.0, float(bbox.get("y1", 0)))),
+        "x2": max(0.0, min(1.0, float(bbox.get("x2", 0)))),
+        "y2": max(0.0, min(1.0, float(bbox.get("y2", 0)))),
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GEMINI_API_URL, json=payload) as response:
-            if response.status != 200:
-                logger.error(f"Gemini error: {await response.text()}")
-                return []
-            data = await response.json()
-            raw = data["candidates"][0]["content"]["parts"][0]["text"]
-            clean = raw.replace("```json", "").replace("```", "").strip()
-            parsed = json.loads(clean)
-            return parsed.get("parts", [])
+def is_valid_bbox(bbox: dict) -> bool:
+    try:
+        x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
+        return x2 > x1 and y2 > y1
+    except Exception:
+        return False
+
+def bbox_area(bbox: dict) -> float:
+    try:
+        return max(0.0, (bbox["x2"] - bbox["x1"]) * (bbox["y2"] - bbox["y1"]))
+    except Exception:
+        return 0.0
+
+def bbox_center(bbox: dict) -> Optional[tuple]:
+    try:
+        return ((bbox["x1"] + bbox["x2"]) / 2, (bbox["y1"] + bbox["y2"]) / 2)
+    except Exception:
+        return None
 
 def crop_with_bbox(image: Image.Image, bbox: dict, padding_ratio: float = CROP_PADDING_RATIO) -> Image.Image:
     w, h = image.size
@@ -123,13 +139,172 @@ def crop_with_bbox(image: Image.Image, bbox: dict, padding_ratio: float = CROP_P
 
     return crop
 
+def detect_balloons_with_yolo(image: Image.Image):
+    """YOLO ile balon tespiti + OCR label okuma (tek sayfa)."""
+    models = get_models()
+    detector = models.get("yolo")
+    ocr = models.get("ocr")
+
+    if detector is None:
+        raise HTTPException(
+            status_code=503,
+            detail="YOLO modeli yüklenmemiş. models/best.pt dosyasını kontrol edin."
+        )
+
+    image_bytes = image_to_bytes(image, fmt=DETECT_FORMAT)
+    detections, cv_image = detector.detect_from_bytes(image_bytes, settings.YOLO_CONFIDENCE)
+
+    img_h, img_w = cv_image.shape[:2]
+    balloons = []
+
+    for det in detections:
+        label = None
+
+        if ocr is not None:
+            try:
+                padding = 6
+                x1 = max(0, int(det.x1) - padding)
+                y1 = max(0, int(det.y1) - padding)
+                x2 = min(img_w, int(det.x2) + padding)
+                y2 = min(img_h, int(det.y2) + padding)
+
+                crop = cv_image[y1:y2, x1:x2].copy()
+                if crop.size > 0:
+                    label = ocr.read_number(crop)
+            except Exception as e:
+                logger.warning(f"OCR hatası: {e}")
+
+        if not label:
+            continue
+
+        center_x = (det.x1 + det.x2) / 2
+        center_y = (det.y1 + det.y2) / 2
+
+        balloons.append({
+            "label": str(label),
+            "x": round(center_x / img_w, 6),
+            "y": round(center_y / img_h, 6),
+        })
+
+    return balloons
+
+def match_parts_to_balloons(parts: List[dict], balloons: List[dict]) -> List[dict]:
+    if not parts or not balloons:
+        return parts
+
+    used = set()
+
+    def nearest_balloon_index(cx, cy, candidates):
+        best_idx = None
+        best_dist = 1e9
+        for idx in candidates:
+            if idx in used:
+                continue
+            bx, by = balloons[idx]["x"], balloons[idx]["y"]
+            dist = (bx - cx) ** 2 + (by - cy) ** 2
+            if dist < best_dist:
+                best_dist = dist
+                best_idx = idx
+        return best_idx
+
+    for part in parts:
+        bbox = part.get("bbox") or {}
+        center = bbox_center(bbox)
+        if not center:
+            continue
+
+        cx, cy = center
+        label = (part.get("label") or "").strip()
+
+        if label:
+            candidates = [i for i, b in enumerate(balloons) if b.get("label") == label]
+            if candidates:
+                idx = nearest_balloon_index(cx, cy, candidates)
+                if idx is not None:
+                    used.add(idx)
+                    continue
+
+        idx = nearest_balloon_index(cx, cy, range(len(balloons)))
+        if idx is not None:
+            used.add(idx)
+            part["label"] = balloons[idx]["label"]
+
+    return parts
+
+async def detect_parts_with_gemini_batch(image: Image.Image, balloons: List[dict], cache_key: str) -> List[dict]:
+    if not balloons:
+        return []
+
+    if cache_key in _PAGE_CACHE:
+        logger.info(f"🧠 Gemini cache hit: {cache_key}")
+        return _PAGE_CACHE[cache_key]
+
+    base64_image = base64.b64encode(image_to_bytes(image, fmt="JPEG", quality=90)).decode("utf-8")
+
+    prompt = f"""
+    You are a technical drawing analyzer.
+
+    Given the full page image, you will receive a list of balloon points (normalized 0..1).
+    For EACH balloon point, follow the arrow that originates from it and return a tight bounding box
+    around the referenced part.
+
+    IMPORTANT:
+    - ALWAYS return the same "label" value given in Balloon points.
+
+    Return ONLY JSON:
+    {{
+      "parts": [
+        {{ "label": "12", "bbox": {{ "x1": 0.12, "y1": 0.08, "x2": 0.32, "y2": 0.28 }} }}
+      ]
+    }}
+
+    Balloon points:
+    {json.dumps(balloons, ensure_ascii=False)}
+    """
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": "image/jpeg", "data": base64_image}}
+            ]
+        }],
+        "generationConfig": { "response_mime_type": "application/json", "temperature": 0.2 }
+    }
+
+    last_error = None
+    for attempt in range(2):
+        try:
+            timeout = aiohttp.ClientTimeout(total=GEMINI_TIMEOUT_SECONDS)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(GEMINI_API_URL, json=payload) as response:
+                    if response.status != 200:
+                        last_error = await response.text()
+                        logger.warning(f"Gemini error (attempt {attempt+1}): {last_error}")
+                    else:
+                        data = await response.json()
+                        raw = data["candidates"][0]["content"]["parts"][0]["text"]
+                        clean = raw.replace("```json", "").replace("```", "").strip()
+                        parsed = json.loads(clean)
+                        _PAGE_CACHE[cache_key] = parsed.get("parts", [])
+                        return _PAGE_CACHE[cache_key]
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"Gemini exception (attempt {attempt+1}): {e}")
+
+        await asyncio.sleep(0.5)
+
+    logger.error(f"Gemini failed after retry: {last_error}")
+    return []
+
 @router.post("/visual-ingest", response_model=VisualIngestResponse)
 async def visual_ingest(
     catalog_id: str = Form(...),
     file: UploadFile = File(...),
     page_start: int = Form(1),
     page_end: int = Form(0),
-    technical_pages: str = Form("[]")
+    technical_pages: str = Form("[]"),
+    allowed_refs_map: str = Form("{}")
 ):
     contents = await file.read()
     doc = fitz.open(stream=contents, filetype="pdf")
@@ -142,6 +317,23 @@ async def visual_ingest(
         technical_pages_list = json.loads(technical_pages) or []
     except Exception:
         technical_pages_list = []
+
+    try:
+        allowed_refs_raw = json.loads(allowed_refs_map) or {}
+    except Exception:
+        allowed_refs_raw = {}
+
+    allowed_refs_by_page = {}
+    for page_key, refs in allowed_refs_raw.items():
+        try:
+            page_num = int(page_key)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(refs, list):
+            continue
+
+        normalized_refs = {normalize_ref(r) for r in refs if normalize_ref(r)}
+        allowed_refs_by_page[page_num] = normalized_refs
 
     total_parts_detected = 0
     total_parts_updated = 0
@@ -163,21 +355,47 @@ async def visual_ingest(
             image = render_page_to_image(doc, i)
             image = enhance_image(image)
 
-            parts = await detect_parts_with_gemini(image)
+            balloons = detect_balloons_with_yolo(image)
+            if not balloons:
+                logger.info(f"⚠️ Sayfa {page_number}: balon bulunamadı.")
+                continue
+
+            cache_key = f"{catalog_id}:{page_number}:{len(balloons)}"
+            parts = await detect_parts_with_gemini_batch(image, balloons, cache_key)
+            parts = match_parts_to_balloons(parts, balloons)
+
+            filtered_parts = []
+            for part in parts:
+                bbox = part.get("bbox") or {}
+                bbox = clamp_bbox(bbox)
+                if not is_valid_bbox(bbox):
+                    continue
+                if bbox_area(bbox) < MIN_BBOX_AREA:
+                    continue
+                part["bbox"] = bbox
+                filtered_parts.append(part)
+
+            parts = filtered_parts
+            logger.info(f"📌 Sayfa {page_number}: balon={len(balloons)} → bbox={len(parts)}")
             total_parts_detected += len(parts)
+
+            allowed_refs = allowed_refs_by_page.get(page_number)
 
             for part in parts:
                 label = (part.get("label") or "").strip()
-                if not label:
+                bbox = part.get("bbox") or {}
+
+                if not label or not bbox:
                     skipped_no_match += 1
                     continue
 
-                bbox = part.get("bbox") or {}
-                ocr_text = (part.get("ocr_text") or "").strip()
-                shape_tags = part.get("shape_tags") or []
+                if allowed_refs is not None:
+                    if normalize_ref(label) not in allowed_refs:
+                        skipped_no_match += 1
+                        continue
 
                 crop_image = crop_with_bbox(image, bbox)
-                embedding_input = f"label:{label} ocr:{ocr_text} tags:{', '.join(shape_tags)}"
+                embedding_input = f"label:{label} tags:gemini_bbox"
                 visual_embedding = get_text_embedding(embedding_input)
 
                 if not visual_embedding:
@@ -215,8 +433,8 @@ async def visual_ingest(
                     update_sql,
                     str(visual_embedding),
                     json.dumps(bbox),
-                    json.dumps(shape_tags),
-                    ocr_text,
+                    json.dumps([]),
+                    "",
                     page_number,
                     visual_image_url,
                     catalog_id,
