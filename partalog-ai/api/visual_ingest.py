@@ -1,40 +1,57 @@
+import base64
 import io
 import json
-import base64
 import uuid
-import fitz  # PyMuPDF
-import aiohttp
 from typing import List
+
+import aiohttp
+import fitz
 from fastapi import APIRouter, UploadFile, File, Form
-from pydantic import BaseModel
-from PIL import Image
 from loguru import logger
+from PIL import Image, ImageFilter, ImageOps
+from pydantic import BaseModel
 
 from config import settings
 from services.embedding import get_text_embedding
-from services.vector_db import get_db_connection
 from services.storage.storage_factory import save_file
+from services.vector_db import get_db_connection
 
 router = APIRouter()
 
-# ✅ Gemini Flash
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
+GEMINI_VISUAL_MODEL = getattr(settings, "GEMINI_VISUAL_MODEL", "gemini-3-pro-preview")
+GEMINI_API_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_VISUAL_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+)
+
+RENDER_DPI = 450
+CROP_PADDING_RATIO = 0.04
+CROP_MIN_SIZE = 300
+SHARPEN_ENABLED = True
+OUTPUT_FORMAT = "PNG"  # ✅ çıktı formatı
+OUTPUT_EXTENSION = "png"
 
 class VisualIngestResponse(BaseModel):
     total_pages: int
     total_parts_detected: int
     total_parts_updated: int
     skipped_no_match: int
+    skipped_non_technical: int
 
 def render_page_to_image(doc: fitz.Document, page_index: int) -> Image.Image:
     page = doc.load_page(page_index)
-    pix = page.get_pixmap(dpi=150)
+    pix = page.get_pixmap(dpi=RENDER_DPI, alpha=False)
     return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
+def enhance_image(image: Image.Image) -> Image.Image:
+    image = ImageOps.autocontrast(image, cutoff=1)
+    if SHARPEN_ENABLED:
+        image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=180, threshold=3))
+    return image
+
 async def detect_parts_with_gemini(image: Image.Image) -> List[dict]:
-    # image → base64
     buffered = io.BytesIO()
-    image.save(buffered, format="JPEG", quality=90)
+    image.save(buffered, format="JPEG", quality=90, subsampling=0)
     base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
     prompt = """
@@ -82,24 +99,38 @@ async def detect_parts_with_gemini(image: Image.Image) -> List[dict]:
             parsed = json.loads(clean)
             return parsed.get("parts", [])
 
-def crop_with_bbox(image: Image.Image, bbox: dict) -> Image.Image:
+def crop_with_bbox(image: Image.Image, bbox: dict, padding_ratio: float = CROP_PADDING_RATIO) -> Image.Image:
     w, h = image.size
     x1 = max(0, int(bbox["x1"] * w))
     y1 = max(0, int(bbox["y1"] * h))
     x2 = min(w, int(bbox["x2"] * w))
     y2 = min(h, int(bbox["y2"] * h))
-    return image.crop((x1, y1, x2, y2))
+
+    pad_x = int((x2 - x1) * padding_ratio)
+    pad_y = int((y2 - y1) * padding_ratio)
+
+    x1 = max(0, x1 - pad_x)
+    y1 = max(0, y1 - pad_y)
+    x2 = min(w, x2 + pad_x)
+    y2 = min(h, y2 + pad_y)
+
+    crop = image.crop((x1, y1, x2, y2))
+
+    if min(crop.size) < CROP_MIN_SIZE:
+        scale = CROP_MIN_SIZE / min(crop.size)
+        new_size = (int(crop.width * scale), int(crop.height * scale))
+        crop = crop.resize(new_size, Image.LANCZOS)
+
+    return crop
 
 @router.post("/visual-ingest", response_model=VisualIngestResponse)
 async def visual_ingest(
     catalog_id: str = Form(...),
     file: UploadFile = File(...),
     page_start: int = Form(1),
-    page_end: int = Form(0)
+    page_end: int = Form(0),
+    technical_pages: str = Form("[]")
 ):
-    """
-    PDF -> teknik resimden parça yakalar, CatalogItems'e visual alanları yazar.
-    """
     contents = await file.read()
     doc = fitz.open(stream=contents, filetype="pdf")
     total_pages = doc.page_count
@@ -107,9 +138,15 @@ async def visual_ingest(
     if page_end <= 0 or page_end > total_pages:
         page_end = total_pages
 
+    try:
+        technical_pages_list = json.loads(technical_pages) or []
+    except Exception:
+        technical_pages_list = []
+
     total_parts_detected = 0
     total_parts_updated = 0
     skipped_no_match = 0
+    skipped_non_technical = 0
 
     conn = await get_db_connection()
     if not conn:
@@ -118,7 +155,14 @@ async def visual_ingest(
     try:
         for i in range(page_start - 1, page_end):
             page_number = i + 1
+
+            if technical_pages_list and page_number not in technical_pages_list:
+                skipped_non_technical += 1
+                continue
+
             image = render_page_to_image(doc, i)
+            image = enhance_image(image)
+
             parts = await detect_parts_with_gemini(image)
             total_parts_detected += len(parts)
 
@@ -132,7 +176,6 @@ async def visual_ingest(
                 ocr_text = (part.get("ocr_text") or "").strip()
                 shape_tags = part.get("shape_tags") or []
 
-                # Crop -> embedding (şimdilik text tabanlı)
                 crop_image = crop_with_bbox(image, bbox)
                 embedding_input = f"label:{label} ocr:{ocr_text} tags:{', '.join(shape_tags)}"
                 visual_embedding = get_text_embedding(embedding_input)
@@ -141,14 +184,16 @@ async def visual_ingest(
                     skipped_no_match += 1
                     continue
 
-                # Crop görselini kaydet
                 buffered = io.BytesIO()
-                crop_image.save(buffered, format="JPEG", quality=90)
+                crop_image.save(
+                    buffered,
+                    format=OUTPUT_FORMAT,
+                    optimize=True
+                )
 
-                object_key = f"{catalog_id}/{page_number}/{label}-{uuid.uuid4().hex}.jpg"
+                object_key = f"{catalog_id}/{page_number}/{label}-{uuid.uuid4().hex}.{OUTPUT_EXTENSION}"
                 visual_image_url = save_file(buffered.getvalue(), object_key)
 
-                # CatalogItems üzerinde güncelle
                 update_sql = """
                     UPDATE "CatalogItems"
                     SET
@@ -188,7 +233,8 @@ async def visual_ingest(
             total_pages=total_pages,
             total_parts_detected=total_parts_detected,
             total_parts_updated=total_parts_updated,
-            skipped_no_match=skipped_no_match
+            skipped_no_match=skipped_no_match,
+            skipped_non_technical=skipped_non_technical
         )
     finally:
         await conn.close()

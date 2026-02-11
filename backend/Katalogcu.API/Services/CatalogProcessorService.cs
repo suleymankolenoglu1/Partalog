@@ -59,6 +59,9 @@ public class CatalogProcessorService
         var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromMinutes(5);
 
+        // ✅ Teknik resim sayfaları
+        var technicalPages = new List<int>();
+
         foreach (var page in pages)
         {
             _logger.LogInformation($"🔄 Sayfa {page.PageNumber} işleniyor...");
@@ -91,6 +94,11 @@ public class CatalogProcessorService
                 // ADIM 1: SAYFA ANALİZİ
                 var analysis = await _aiService.AnalyzePageAsync(fileBytes);
                 page.AiDescription = analysis.Title;
+
+                if (analysis.IsTechnicalDrawing)
+                {
+                    technicalPages.Add(page.PageNumber);
+                }
 
                 // ADIM 2: TABLO VE VEKTÖR
                 if (analysis.IsPartsList)
@@ -168,10 +176,10 @@ public class CatalogProcessorService
 
         _logger.LogInformation($"🏁 Katalog İşlemi Tamamlandı: {catalog.Name}");
 
-        // ✅ Visual Ingest (PDF üzerinden otomatik tetikle)
+        // ✅ Visual Ingest (Sadece teknik resim sayfaları ile)
         try
         {
-            await TriggerVisualIngestAsync(client, catalogId, catalog.PdfUrl);
+            await TriggerVisualIngestAsync(client, catalogId, catalog.PdfUrl, technicalPages);
             _logger.LogInformation("✅ visual-ingest tetiklendi.");
         }
         catch (Exception ex)
@@ -191,7 +199,7 @@ public class CatalogProcessorService
         }
     }
 
-    private async Task TriggerVisualIngestAsync(HttpClient client, Guid catalogId, string pdfUrl)
+    private async Task TriggerVisualIngestAsync(HttpClient client, Guid catalogId, string pdfUrl, List<int> technicalPages)
     {
         var pdfPath = GetFullPath(pdfUrl);
         if (pdfPath == null)
@@ -203,6 +211,7 @@ public class CatalogProcessorService
         using var fs = File.OpenRead(pdfPath);
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(catalogId.ToString()), "catalog_id");
+        content.Add(new StringContent(JsonSerializer.Serialize(technicalPages)), "technical_pages");
         content.Add(new StreamContent(fs), "file", Path.GetFileName(pdfPath));
 
         var response = await client.PostAsync($"{PYTHON_API_URL}/api/visual-ingest", content);

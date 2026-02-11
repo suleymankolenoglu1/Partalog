@@ -1,0 +1,97 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2192 >>
+stream
+BT
+/F1 20 Tf
+50 780 Td
+(Katalogcu Özeti) Tj
+0 -30 Td
+/F1 14 Tf
+(Nedir?) Tj
+0 -22 Td
+/F1 11 Tf
+(AI destekli dijital katalog yönetimi ve ürün tanıma platformu.) Tj
+0 -16 Td
+(YOLO ile otomatik hotspot tespitiyle PDF/Excel işleme sunar.) Tj
+0 -16 Td
+/F1 14 Tf
+0 -6 Td
+(Kimin için?) Tj
+0 -22 Td
+/F1 11 Tf
+(Dijital katalog, ürün ve pazarlama ekiplerinin katalog yöneticileri için.) Tj
+0 -16 Td
+/F1 14 Tf
+0 -6 Td
+(Ne yapar?) Tj
+0 -20 Td
+/F1 11 Tf
+(- Katalog ve ürün yaşam döngüsünü \(oluşturma, güncelleme, silme\) yönlendirir.) Tj
+0 -16 Td
+(- JWT tabanlı kimlik doğrulama ile kullanıcı ve rol yönetimi sunar.) Tj
+0 -16 Td
+(- PDF yükleme, OCR destekli veri çıkarımı ve Excel dışa aktarma sağlar.) Tj
+0 -16 Td
+(- YOLO destekli hotspot tespiti ile tıklanabilir ürün bölgeleri oluşturur.) Tj
+0 -16 Td
+(- Frontend üzerinden katalog sayfalarını görselleştirip düzenleme imkanı verir.) Tj
+0 -16 Td
+(- PostgreSQL veritabanında metadata, sayfa ve hotspot kayıtlarını saklar.) Tj
+0 -16 Td
+/F1 14 Tf
+0 -6 Td
+(Nasıl çalışır?) Tj
+0 -20 Td
+/F1 11 Tf
+(- Angular ön yüzü HTTP ile .NET 9 Katalogcu.API \(Clean Architecture\) uç noktalarına bağlanır.) Tj
+0 -16 Td
+(- Backend Domain/Application katmanları ve Entity Framework Core PostgreSQL ile veri yönetir.) Tj
+0 -16 Td
+(- Hotspot istekleri Katalogcu.API içindeki PartalogAiService aracılığıyla Python FastAPI servisine yönlenir.) Tj
+0 -16 Td
+(- Partalog AI \(YOLO, OCR, embedding\) tespitleri JSON olarak döner, veritabanına kaydedilir ve frontende iletilir.) Tj
+0 -16 Td
+/F1 14 Tf
+0 -6 Td
+(Nasıl çalıştırılır?) Tj
+0 -20 Td
+/F1 11 Tf
+(- .NET 9, Node.js+npm, Python 3.8+, Docker ve PostgreSQL gereksinimlerini kurun.) Tj
+0 -16 Td
+(- backend dizininde `docker-compose up -d` ile PostgreSQL container'ı başlatın.) Tj
+0 -16 Td
+(- backend/Katalogcu.API içinde `dotnet restore` ve `dotnet run` ile API yi çalıştırın.) Tj
+0 -16 Td
+(- frontend/katalogcu-frontend dizininde `npm install` ve `npm start` ile Angular uygulamasını açın.) Tj
+0 -16 Td
+(- partalog-ai dizininde `pip install -r requirements.txt` sonra `python main.py` ile YOLO/OCR servisini başlatın.) Tj
+0 -16 Td
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000115 00000 n
+0000000241 00000 n
+0000002484 00000 n
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2554
+%%EOF

@@ -14,7 +14,7 @@ def save_bytes(file_bytes: bytes, object_key: str) -> str:
         Bucket=settings.STORAGE_BUCKET,
         Key=object_key,
         Body=file_bytes,
-        ContentType="image/jpeg"
+        ContentType="image/png"  # ✅ PNG için düzeltildi
     )
 
     return f"{settings.STORAGE_BASE_URL}/{object_key}"
