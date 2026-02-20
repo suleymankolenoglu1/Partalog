@@ -6,6 +6,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from pathlib import Path
 
+def _clean_env(value: str) -> str:
+    return value.strip().strip('"').strip("'").strip()
+
 class Settings(BaseSettings):
     # GENEL
     APP_NAME: str = "Partalog AI Service"
@@ -24,7 +27,8 @@ class Settings(BaseSettings):
     # Hem 'GEMINI_API_KEY' hem de 'GOOGLE_API_KEY' olarak gelsen kabul etsin.
     # .env dosyasında hangisi varsa onu alır.
     GEMINI_API_KEY: str = Field(default="", validation_alias="GOOGLE_API_KEY")
-    
+    GEMINI_VISUAL_MODEL: str = Field(default="gemini-3-pro-preview")
+
     # --- VERİTABANI (YENİ EKLENDİ) ---
     # train_dictionary.py artık şifreyi buradan okuyacak.
     # Varsayılan değer boş, .env dosyasından gelmeli.
@@ -64,10 +68,41 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore" # Bilinmeyen değişkenleri hata vermeden geç
     )
-    
+
     def ensure_directories(self):
         self.MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 🔒 TIRNAK TEMİZLEME
+    def clean_env_values(self):
+        # API ve model
+        if self.GEMINI_API_KEY:
+            self.GEMINI_API_KEY = _clean_env(self.GEMINI_API_KEY)
+        if self.GEMINI_VISUAL_MODEL:
+            self.GEMINI_VISUAL_MODEL = _clean_env(self.GEMINI_VISUAL_MODEL)
+
+        # DB
+        if self.DB_CONNECTION_STRING:
+            self.DB_CONNECTION_STRING = _clean_env(self.DB_CONNECTION_STRING)
+
+        # Storage
+        if self.STORAGE_PROVIDER:
+            self.STORAGE_PROVIDER = _clean_env(self.STORAGE_PROVIDER)
+        if self.STORAGE_BUCKET:
+            self.STORAGE_BUCKET = _clean_env(self.STORAGE_BUCKET)
+        if self.STORAGE_BASE_URL:
+            self.STORAGE_BASE_URL = _clean_env(self.STORAGE_BASE_URL)
+        if self.STORAGE_LOCAL_DIR:
+            self.STORAGE_LOCAL_DIR = _clean_env(self.STORAGE_LOCAL_DIR)
+        if self.STORAGE_S3_ENDPOINT:
+            self.STORAGE_S3_ENDPOINT = _clean_env(self.STORAGE_S3_ENDPOINT)
+        if self.STORAGE_ACCESS_KEY:
+            self.STORAGE_ACCESS_KEY = _clean_env(self.STORAGE_ACCESS_KEY)
+        if self.STORAGE_SECRET_KEY:
+            self.STORAGE_SECRET_KEY = _clean_env(self.STORAGE_SECRET_KEY)
+        if self.STORAGE_REGION:
+            self.STORAGE_REGION = _clean_env(self.STORAGE_REGION)
 
 
 settings = Settings()
 settings.ensure_directories()
+settings.clean_env_values()

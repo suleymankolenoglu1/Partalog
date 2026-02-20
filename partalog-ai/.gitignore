@@ -1,21 +1,40 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
+### --- PYTHON & AI MODELLERİ (En çok yer kaplayanlar) ---
+# YOLO ve diğer modellerin ana dosyaları
 *.pt
 *.pth
 *.onnx
 *.weights
+*.h5
+*.model
+# Eğitim sırasında oluşan loglar ve geçici ağırlıklar
+yolo-service/runs/
+**/runs/
 
-.Python
-venv/
-
-# Data
+### --- VERİ VE CACHE ---
+# Vektör veritabanı ve büyük JSON dosyaları
 data/vector_db/
-
-# Models (if not part of the repo)
-# models/*.pt
-# models/*.pth
-
 *.sanayi_sozlugu.json
+*.test_models.py
+*.test_search.py
+*.visual_debug.log
+*.train_dictionary.py
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+### --- ORTAMLAR VE SİSTEM ---
+# Sanal kütüphane klasörleri (Yüzlerce MB tutar)
+venv/
+.venv/
+env/
+.Python
+.env
+
+### --- GEÇİCİ ÇIKTILAR ---
+# Üretilen PDF veya resimler
+**/tmp/
+**/output/
+**/temp/
+.DS_Store

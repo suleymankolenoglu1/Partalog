@@ -1,16 +1,25 @@
-
+# --- KRİTİK VE ÖZEL DOSYALAR (Güvenlik için) ---
 appsettings.json
 appsettings.Development.json
-google-key.json
+
 *.key.json
 
+# --- .NET BUILD ÇIKTILARI (Boyutu şişiren asıl yer burası) ---
 bin/
 obj/
+# Visual Studio ve Rider ayarları
 .vs/
-*.use
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
 
+# --- FRONTEND KALINTILARI (Eğer backend içinde frontend varsa) ---
 node_modules/
 dist/
 .angular/
+
+# --- SİSTEM VE DİĞER ---
 .DS_Store
-.sanayi_sozlugu.json
+
+*.use
